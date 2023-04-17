@@ -85,8 +85,8 @@ def face_matching(face_embedding, embedding_list: list, similarity_threshold) ->
     for i, embedding in enumerate(embedding_list):
         cosine_similarity = cosine(face_embedding, embedding)
         if cosine_similarity < similarity_threshold:
-            # maybe plus one idk
-            print(f'A face matched with {cosine_similarity * 100}% distance from embedding {i + 1} in list')
+            # this uses precoded file name
+            print(f'A face matched with {cosine_similarity * 100}% distance from embedding {i + 1} in list (file face{i + 1}.jpg)')
             return True
     
     return False
