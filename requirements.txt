@@ -1,0 +1,5 @@
+Pillow==9.50
+facenet-pytorch==2.5.3
+scipy==1.10.1
+opencv-python==4.7.0.72
+mctnn==0.1.1
