@@ -1,4 +1,11 @@
 Lib/*
-!Lib/
 
-poseidon/phonecamapi/*
+phonecamapi/*
+
+Include/*
+
+Scripts/*
+
+share/*
+
+pyvenv.cfg

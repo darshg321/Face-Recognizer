@@ -31,7 +31,7 @@ def load_embeddings(load_amount: int, images_path: str) -> list:
     
     load_amount = 5
     
-    images_path = './poseidon/detected_faces/'
+    images_path = './detected_faces/'
     
     embeddings = load_embeddings(load_amount, images_path)
     
@@ -54,7 +54,7 @@ def load_embeddings(load_amount: int, images_path: str) -> list:
     return embeddings
 
 images_to_load = 15
-images_path = './poseidon/detected_faces/'
+images_path = './detected_faces/'
 
 embeddings = load_embeddings(images_to_load, images_path)
 print('Finished loading faces')
@@ -91,7 +91,7 @@ def face_matching(face_embedding, embedding_list: list, similarity_threshold) ->
     
     return False
 
-video_file = './poseidon/faceexamplevideo.mkv'
+video_file = './faceexamplevideo.mkv'
 
 video_capture = cv2.VideoCapture(video_file)
 min_probability = 0.95

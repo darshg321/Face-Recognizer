@@ -3,7 +3,7 @@ from PIL import Image
 from mtcnn.mtcnn import MTCNN
 import numpy as np
 
-video_capture = cv2.VideoCapture('./poseidon/faceexamplevideo.mkv')
+video_capture = cv2.VideoCapture('./faceexamplevideo.mkv')
 detector = MTCNN()
 
 min_face_confidence = 0
@@ -30,7 +30,7 @@ while True:
                 imageRGB = cv2.cvtColor(pixels[y:y+h, x:x+h], cv2.COLOR_BGR2RGB)
                 new_image = Image.fromarray(imageRGB)
                 images_saved += 1
-                new_image.save(f"./poseidon/detected_faces/face{images_saved}.jpg")
+                new_image.save(f"./detected_faces/face{images_saved}.jpg")
                 
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
 

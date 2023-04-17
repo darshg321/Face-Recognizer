@@ -7,8 +7,8 @@ from scipy.spatial.distance import cosine
 facenet_model = InceptionResnetV1(pretrained='vggface2').eval()
 
 # Load two input images
-image1_path = './poseidon/detected_faces/face12.jpg'
-image2_path = './poseidon/detected_faces/face9.jpg'
+image1_path = './detected_faces/face12.jpg'
+image2_path = './detected_faces/face9.jpg'
 image1 = Image.open(image1_path).convert('RGB')
 image2 = Image.open(image2_path).convert('RGB')
 
