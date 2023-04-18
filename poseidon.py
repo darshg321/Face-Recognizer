@@ -4,6 +4,8 @@
 #  - Use cosine distance to compare faces - X
 #  - Send to an api when a match is found
 #  - Save unmatched faces to a database as image or embedding
+#  - maybe switch over to the seperate mtcnn
+#  - use os to load images from a folder - X
 
 # TODO: Problems
 # - rectange is not the right size
@@ -11,47 +13,79 @@ from PIL import Image
 from facenet_pytorch import MTCNN, InceptionResnetV1
 from scipy.spatial.distance import cosine
 import cv2
+import os
 
 facenet_model = InceptionResnetV1(pretrained='vggface2').eval()
 mtcnn = MTCNN()
 
-
-def load_embeddings(load_amount: int, images_path: str) -> list:
+def load_embeddings(load_amount: int, images_path: str) -> dict:
     """
-    Loads the face embeddings from the images in the images_path folder
-    and returns a list of the MTCNN embeddings.
-    If there's no face detected in the image, it will raise an exception.
-    
-    :param load_amount: The amount of images to load
-    :param images_path: The path to the images folder
-    :return: A list of the MTCNN embeddings of the loaded faces.
-    :exception: If there's no face detected in the image, it will raise an exception.
-    
-    Example:
-    
-    load_amount = 5
-    
-    images_path = './detected_faces/'
-    
-    embeddings = load_embeddings(load_amount, images_path)
-    
-    print(embeddings)
-    """
-    embeddings = []
-    for i in range(1, load_amount + 1):
-        image = images_path + 'face' + str(i) + '.jpg'
+        Loads the face embeddings from the images in the images_path folder
+        and returns a dict of the MTCNN embeddings, key being a tuple of the embeddings, 
+        and value being the path of the image that corresponds.
+        If there's no face detected in the image, it will raise an exception.
+        Supported formats: .jpg, .jpeg, .png
         
-        face = Image.open(image).convert('RGB')
+        :param load_amount: The amount of images to load after filtering out unsupported formats
+        :param images_path: The path to the images folder
+        :return: A dict of the MTCNN embeddings, key is a tuple of the embedding, value is the image path
+        :raises Exception: If there's no face detected in the image
+        :raises Exception: If there's less images than the load amount
+        :raises Exception: If the images folder doesn't exist
+        
+        :Example:
+        
+        >>> load_amount = 10
+        >>> images_path = 'images/'
+        >>> embeddings = load_embeddings(load_amount, images_path)
+        
+        >>> len(embeddings)
+        10
+        
+        >>> embeddings[('0.0', '0.0', '0.0', '0.0')]
+        'image.jpg'
+    """
+    
+    if images_path[-1] != '/':
+        images_path += '/'
+    
+    if not os.path.exists(images_path):
+        raise Exception('Images path does not exist')
+    
+    allowed_extensions = ['jpg', 'jpeg', 'png']
+    
+    # filter the files, removing folders and extensions that aren't allowed
+    filtered_files = [
+        file for file in os.listdir(images_path)
+        if os.path.isfile(os.path.join(images_path, file)) and
+        (any(file.endswith(ext) for ext in allowed_extensions) or
+        print(f"File format not supported: {file}"))
+    ]
+    
+    # if there are less files than the load amount, raise an exception
+    if len(filtered_files) < load_amount:
+        raise Exception(f'Supported files in the images folder lower than load amount, supported amount: {len(filtered_files)}, load amount: {load_amount}')
+    
+    images_embeddings: dict = {}
+    for i, file in enumerate(filtered_files, start = 1):
+        if i > load_amount:
+            break
+        
+        # load the image
+        face = Image.open(images_path + file).convert('RGB')
         face = mtcnn(face)
         if face is None:
-            print('Face not detected in image', image)
-            raise Exception('Face not detected in image')
+            print('Face not detected in image', file)
+            continue
         
-        face = facenet_model(face.unsqueeze(0)).detach().numpy()[0]
-        embeddings.append(face)
-        print('Loaded face', i)
+        # get the embedding
+        face_embedding = facenet_model(face.unsqueeze(0)).detach().numpy()[0]
+        face_embedding = tuple(face_embedding.tolist())
+        images_embeddings[face_embedding] = file
+        
+        print(f'Loaded face {i}: file {images_path + file}')
     
-    return embeddings
+    return images_embeddings
 
 images_to_load = 15
 images_path = './detected_faces/'
@@ -59,34 +93,21 @@ images_path = './detected_faces/'
 embeddings = load_embeddings(images_to_load, images_path)
 print('Finished loading faces')
 
-def face_matching(face_embedding, embedding_list: list, similarity_threshold) -> bool:
+def face_matching(face_embedding, embeddings, similarity_threshold) -> bool:
     """
-    Matches the face_embedding with the embeddings in the embedding_list
-    and returns True if a match is found.
-    
-    :param face_embedding: The MTCNN embedding of the face to match
-    :param embedding_list: The list of MTCNN embeddings of the faces to match with
-    :param similarity_threshold: The threshold to match the face with
-    :return: True if a match is found, False otherwise.
-    
-    Example:
-    
-    face_embedding = embeddings[0]
-    
-    embedding_list = embeddings[1:]
-    
-    similarity_threshold = 0.4
-    
-    face_matching(face_embedding, embedding_list, similarity_threshold)
+        Matches the face_embedding with the embeddings in the embeddings
+        and returns True if a match is found.
+        
+        :param face_embedding: The MTCNN embedding of the face to match
+        :param embeddings: The list of MTCNN embeddings of the faces to match with
+        :param similarity_threshold: The threshold to match the face with
+        :return: True if a match is found, False otherwise.    
     """
-    
-    # maybe return what face its matching with specifically or print similarity with all faces
-    # maybe return a list with distances and check each distance, instead of bool
-    for i, embedding in enumerate(embedding_list):
+    for i, embedding in enumerate(embeddings):
         cosine_similarity = cosine(face_embedding, embedding)
+        
         if cosine_similarity < similarity_threshold:
-            # this uses precoded file name
-            print(f'A face matched with {cosine_similarity * 100}% distance from embedding {i + 1} in list (file face{i + 1}.jpg)')
+            print(f'A face matched with {cosine_similarity * 100}% distance from embedding {i + 1} in list (File: {embeddings[embedding]})')
             return True
     
     return False
@@ -112,7 +133,7 @@ while True:
             if prob < min_probability:
                 continue
             x, y, w, h = box
-            x, y, w, h = int(x), int(y), int(w), int(h)
+            x, y, w, h = round(x), round(y), round(w), round(h)
 
             face = rgb_frame[y:y+h, x:x+w]
             # maybe needed
@@ -126,9 +147,9 @@ while True:
             match = face_matching(face_embedding, embeddings, 0.4)
             if match:
                 print('Match found')
-                cv2.rectangle(frame, (x, y), (int((x+w)/1.5), int((y+h)/1.5)), (0, 0, 255), 2)
+                cv2.rectangle(frame, (x, y), (round((x+w)/1.5), round((y+h)/1.5)), (0, 255, 0), 2)
             else:
-                cv2.rectangle(frame, (x, y), (int((x+w)/1.5), int((y+h)/1.5)), (0, 255, 0), 2)
+                cv2.rectangle(frame, (x, y), (round((x+w)/1.5), round((y+h)/1.5)), (0, 0, 255), 2)
     
     cv2.imshow('Video', frame)
     

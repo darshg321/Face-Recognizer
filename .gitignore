@@ -8,4 +8,6 @@ Scripts/*
 
 share/*
 
+.vscode/*
+
 pyvenv.cfg
