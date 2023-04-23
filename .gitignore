@@ -11,3 +11,5 @@ share/*
 .vscode/*
 
 pyvenv.cfg
+
+dashboard/*

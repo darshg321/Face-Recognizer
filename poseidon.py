@@ -6,9 +6,13 @@
 #  - Save unmatched faces to a database as image or embedding
 #  - maybe switch over to the seperate mtcnn
 #  - use os to load images from a folder - X
+#  - when db grows, comparing faces will take more time than detecting faces
+#    collect faces and only compare them set amount of sec/frames (batch processing)
+#  - maybe add argparse
 
 # TODO: Problems
 # - rectange is not the right size
+
 from PIL import Image
 from facenet_pytorch import MTCNN, InceptionResnetV1
 from scipy.spatial.distance import cosine
@@ -42,8 +46,8 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
         >>> len(embeddings)
         10
         
-        >>> embeddings[('0.0', '0.0', '0.0', '0.0')]
-        'image.jpg'
+        >>> print(embeddings)
+        {(0, 0, 0, 0): 'image.jpg'}
     """
     
     if images_path[-1] != '/':
@@ -87,19 +91,13 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
     
     return images_embeddings
 
-images_to_load = 15
-images_path = './detected_faces/'
-
-embeddings = load_embeddings(images_to_load, images_path)
-print('Finished loading faces')
-
-def face_matching(face_embedding, embeddings, similarity_threshold) -> bool:
+def face_matching(face_embedding, embeddings: list | dict, similarity_threshold) -> bool:
     """
         Matches the face_embedding with the embeddings in the embeddings
         and returns True if a match is found.
         
         :param face_embedding: The MTCNN embedding of the face to match
-        :param embeddings: The list of MTCNN embeddings of the faces to match with
+        :param embeddings: A list or dictionary of MTCNN embeddings of the faces to match with. In a dictionary, the key has to be the embedding.
         :param similarity_threshold: The threshold to match the face with
         :return: True if a match is found, False otherwise.    
     """
@@ -112,17 +110,26 @@ def face_matching(face_embedding, embeddings, similarity_threshold) -> bool:
     
     return False
 
+
+images_to_load = 15
+images_path = './detected_faces/'
+
+embeddings = load_embeddings(images_to_load, images_path)
+print('Finished loading faces')
+
 video_file = './faceexamplevideo.mkv'
 
 video_capture = cv2.VideoCapture(video_file)
+frame_count = 0
 min_probability = 0.95
 
 while True:
     ret, frame = video_capture.read()
     if not ret:
-        print('Error loading video or video file ended')
+        print(f'Error loading video or video file ended (Frame: {frame_count})')
         break
     
+    frame_count += 1
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
     # Detect faces in the frame
@@ -132,24 +139,23 @@ while True:
         for box, prob in zip(boxes, probs):
             if prob < min_probability:
                 continue
-            x, y, w, h = box
-            x, y, w, h = round(x), round(y), round(w), round(h)
-
+            x, y, w, h = box.astype(int)
+            
             face = rgb_frame[y:y+h, x:x+w]
             # maybe needed
-            # face = cv2.resize(face, (160, 160))
+            face = cv2.resize(face, (160, 160))
             tensor_image = mtcnn(face)
-            
-            # TODO: save face as image or maybe face embedding
             
             face_embedding = facenet_model(tensor_image.unsqueeze(0)).detach().numpy()[0]
             
             match = face_matching(face_embedding, embeddings, 0.4)
             if match:
-                print('Match found')
-                cv2.rectangle(frame, (x, y), (round((x+w)/1.5), round((y+h)/1.5)), (0, 255, 0), 2)
+                print(f'Match found at frame {frame_count}')
+                # maybe save it
+                cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 255, 0), 2)
             else:
-                cv2.rectangle(frame, (x, y), (round((x+w)/1.5), round((y+h)/1.5)), (0, 0, 255), 2)
+                # TODO: save as image or embedding or array or something
+                cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 0, 255), 2)
     
     cv2.imshow('Video', frame)
     
