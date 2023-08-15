@@ -24,9 +24,11 @@ import cv2
 import os
 import argparse
 from random import randint
+from torch.cuda import is_available
 
 facenet_model = InceptionResnetV1(pretrained='vggface2').eval()
-mtcnn = MTCNN()
+device = 'cuda' if is_available() else 'cpu'
+mtcnn = MTCNN(device=device)
 
 
 def load_embeddings(load_amount: int, images_path: str) -> dict:
