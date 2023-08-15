@@ -10,6 +10,9 @@
 #    collect faces and only compare them set amount of sec/frames (batch processing)
 #  - maybe add argparse - X
 #  - add compatibility for links to video not just a video file
+#  - add support for gpu
+
+# run detection, if match use naming scheme face{num}_{image number}
 
 # TODO: Problems
 # - rectange is not the right size
@@ -20,9 +23,10 @@ from scipy.spatial.distance import cosine
 import cv2
 import os
 import argparse
+from random import randint
 
 facenet_model = InceptionResnetV1(pretrained='vggface2').eval()
-mtcnn = MTCNN()
+mtcnn = MTCNN(device='cuda')
 
 
 def load_embeddings(load_amount: int, images_path: str) -> dict:
@@ -94,7 +98,7 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
     
     return images_embeddings
 
-def face_matching(face_embedding, embeddings: list | dict, similarity_threshold: float) -> bool:
+def face_matching(face_embedding, embeddings: list | dict, similarity_threshold: float):
     """
         Matches the face_embedding with the embeddings in the embeddings
         and returns True if a match is found.
@@ -102,17 +106,24 @@ def face_matching(face_embedding, embeddings: list | dict, similarity_threshold:
         :param face_embedding: The MTCNN embedding of the face to match
         :param embeddings: A list or dictionary of MTCNN embeddings of the faces to match with. In a dictionary, the key has to be the embedding.
         :param similarity_threshold: The threshold to match the face with
-        :return: True if a match is found, False otherwise.    
+        :return: The filename if a match is found, False otherwise.    
     """
     for i, embedding in enumerate(embeddings):
         cosine_similarity = cosine(face_embedding, embedding)
         
         if cosine_similarity < similarity_threshold:
             print(f'A face matched with {cosine_similarity * 100}% distance from embedding {i + 1} in list (File: {embeddings[embedding]})')
-            return True
+            return embeddings[embedding]
     
     return False
 
+def face_saving(PIL_face_image, match_file):
+    # change from random to some system
+    if not match_file:
+        match_file = 'unknown'
+    filename = f'./saved_faces/{match_file}_{randint(1, 1000)}.jpg'
+    PIL_face_image.save(filename)
+    print(f'Saved face {filename}')
 
 def Main():
 
@@ -137,7 +148,8 @@ def Main():
     
     # if all args are not specified, use example values
     if all(not arg for arg in [args.images_path, args.load_amount, args.video_path, args.min_probability, args.max_distance]):
-        images_to_load = 15
+        # maybe change these
+        images_to_load = 3
         images_path = './detected_faces/'
         video_file = './faceexamplevideo.mkv'
         min_probability = 0.95
@@ -185,19 +197,23 @@ def Main():
                 
                 face = rgb_frame[y:y+h, x:x+w]
                 # maybe needed
-                face = cv2.resize(face, (160, 160))
+                # face = cv2.resize(face, (160, 160))
                 tensor_image = mtcnn(face)
                 
                 face_embedding = facenet_model(tensor_image.unsqueeze(0)).detach().numpy()[0]
                 
-                match = face_matching(face_embedding, embeddings, max_distance)
-                if match:
+                match_file = face_matching(face_embedding, embeddings, max_distance)
+                if match_file:
                     print(f'Match found at frame {frame_count}')
-                    # maybe save it
                     cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 255, 0), 2)
+
                 else:
                     # TODO: save as image or embedding or array or something
                     cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 0, 255), 2)
+                
+                # convert face to PIL image
+                face_image = Image.fromarray(face)
+                face_saving(face_image, match_file)
         
         cv2.imshow('Video', frame)
         

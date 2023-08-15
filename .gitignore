@@ -1,15 +1,17 @@
-Lib/*
+Lib
 
-phonecamapi/*
+phonecamapi
 
-Include/*
+Include
 
-Scripts/*
+Scripts
 
-share/*
+share
 
-.vscode/*
+.vscode
 
 pyvenv.cfg
 
-dashboard/*
+dashboard
+
+saved_faces
