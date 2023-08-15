@@ -26,7 +26,7 @@ import argparse
 from random import randint
 
 facenet_model = InceptionResnetV1(pretrained='vggface2').eval()
-mtcnn = MTCNN(device='cuda')
+mtcnn = MTCNN()
 
 
 def load_embeddings(load_amount: int, images_path: str) -> dict:
