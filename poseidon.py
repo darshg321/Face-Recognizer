@@ -10,122 +10,29 @@
 #    collect faces and only compare them set amount of sec/frames (batch processing)
 #  - maybe add argparse - X
 #  - add compatibility for links to video not just a video file
-#  - add support for gpu
+#  - add support for gpu - X
+#  - add embeddings to images ?
+#  - seperate modules
+#  - fix importing modules multiple times
+#  - seperate get_embeddings
+#  - if tensor image doesnt have a face raise exception
+
 
 # run detection, if match use naming scheme face{num}_{image number}
 
 # TODO: Problems
 # - rectange is not the right size
+#  - not printing if an image doesnt contain a face
 
-from PIL import Image
-from facenet_pytorch import MTCNN, InceptionResnetV1
-from scipy.spatial.distance import cosine
+from common_imports import os, mtcnn
+
 import cv2
-import os
 import argparse
-from random import randint
-from torch.cuda import is_available
 
-facenet_model = InceptionResnetV1(pretrained='vggface2').eval()
-device = 'cuda' if is_available() else 'cpu'
-mtcnn = MTCNN(device=device)
-
-
-def load_embeddings(load_amount: int, images_path: str) -> dict:
-    """
-        Loads the face embeddings from the images in the images_path folder
-        and returns a dict of the MTCNN embeddings, key being a tuple of the embeddings, 
-        and value being the path of the image that corresponds.
-        If there's no face detected in the image, it will raise an exception.
-        Supported formats: .jpg, .jpeg, .png
-        
-        :param load_amount: The amount of images to load after filtering out unsupported formats
-        :param images_path: The path to the images folder
-        :return: A dict of the MTCNN embeddings, key is a tuple of the embedding, value is the image path
-        :raises Exception: If there's no face detected in the image
-        :raises Exception: If there's less images than the load amount
-        :raises Exception: If the images folder doesn't exist
-        
-        :Example:
-        
-        >>> load_amount = 10
-        >>> images_path = 'images/'
-        >>> embeddings = load_embeddings(load_amount, images_path)
-        
-        >>> len(embeddings)
-        10
-        
-        >>> print(embeddings)
-        {(0, 0, 0, 0): 'image.jpg'}
-    """
-    
-    if images_path[-1] != '/':
-        images_path += '/'
-    
-    if not os.path.exists(images_path):
-        raise Exception('Images path does not exist')
-    
-    allowed_image_extensions = ['jpg', 'jpeg', 'png']
-    
-    # filter the files, removing folders and extensions that aren't allowed
-    filtered_files = [
-        file for file in os.listdir(images_path)
-        if os.path.isfile(os.path.join(images_path, file)) and
-        (any(file.endswith(ext) for ext in allowed_image_extensions) or
-        print(f"File format not supported: {file}"))
-    ]
-    
-    # if there are less files than the load amount, raise an exception
-    if len(filtered_files) < load_amount:
-        raise Exception(f'Supported files in the images folder lower than load amount, supported amount: {len(filtered_files)}, load amount: {load_amount}')
-    
-    images_embeddings: dict = {}
-    for i, file in enumerate(filtered_files, start = 1):
-        if i > load_amount:
-            break
-        
-        # load the image
-        face = Image.open(images_path + file).convert('RGB')
-        face = mtcnn(face)
-        if face is None:
-            print('Face not detected in image', file)
-            continue
-        
-        # get the embedding
-        face_embedding = facenet_model(face.unsqueeze(0)).detach().numpy()[0]
-        face_embedding = tuple(face_embedding.tolist())
-        images_embeddings[face_embedding] = file
-        
-        print(f'Loaded face {i}: file {images_path + file}')
-    
-    return images_embeddings
-
-def face_matching(face_embedding, embeddings: list | dict, similarity_threshold: float):
-    """
-        Matches the face_embedding with the embeddings in the embeddings
-        and returns True if a match is found.
-        
-        :param face_embedding: The MTCNN embedding of the face to match
-        :param embeddings: A list or dictionary of MTCNN embeddings of the faces to match with. In a dictionary, the key has to be the embedding.
-        :param similarity_threshold: The threshold to match the face with
-        :return: The filename if a match is found, False otherwise.    
-    """
-    for i, embedding in enumerate(embeddings):
-        cosine_similarity = cosine(face_embedding, embedding)
-        
-        if cosine_similarity < similarity_threshold:
-            print(f'A face matched with {cosine_similarity * 100}% distance from embedding {i + 1} in list (File: {embeddings[embedding]})')
-            return embeddings[embedding]
-    
-    return False
-
-def face_saving(PIL_face_image, match_file):
-    # change from random to some system
-    if not match_file:
-        match_file = 'unknown'
-    filename = f'./saved_faces/{match_file}_{randint(1, 1000)}.jpg'
-    PIL_face_image.save(filename)
-    print(f'Saved face {filename}')
+from load_embeddings import load_embeddings
+from face_matching import face_matching
+from get_embedding import get_embedding
+from save_face import save_face
 
 def Main():
 
@@ -173,7 +80,11 @@ def Main():
     if not any(video_file.endswith(ext) for ext in allowed_video_extensions):
         raise Exception('Video file extension not supported')
     
+    
+    # try:
     embeddings = load_embeddings(images_to_load, images_path)
+    # except Exception as e:
+        # print(e)
     print('Finished loading faces')
     
     video_capture = cv2.VideoCapture(video_file)
@@ -198,24 +109,30 @@ def Main():
                 x, y, w, h = box.astype(int)
                 
                 face = rgb_frame[y:y+h, x:x+w]
-                # maybe needed
-                # face = cv2.resize(face, (160, 160))
-                tensor_image = mtcnn(face)
                 
-                face_embedding = facenet_model(tensor_image.unsqueeze(0)).detach().numpy()[0]
+                face_embedding = get_embedding(face)
                 
-                match_file = face_matching(face_embedding, embeddings, max_distance)
-                if match_file:
+                match_info = face_matching(face_embedding, embeddings, max_distance)
+                
+                
+                if match_info:
+                    
+                    cosine_similarity, embedding_index, match_file = match_info
+                    
+                    print(f'A face matched with {cosine_similarity * 100}% distance from embedding {embedding_index} in list (File: {match_file})')
                     print(f'Match found at frame {frame_count}')
+                    
                     cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 255, 0), 2)
-
                 else:
                     # TODO: save as image or embedding or array or something
+                    # need to fix match_file
+                    match_file = False
                     cv2.rectangle(frame, (x, y), ((x+w), (y+h)), (0, 0, 255), 2)
                 
-                # convert face to PIL image
-                face_image = Image.fromarray(face)
-                face_saving(face_image, match_file)
+                # convert face to PIL image maybe add this to save_face module
+                
+                face_file = save_face(face, match_file)
+                print(f'Face saved to {face_file}')
         
         cv2.imshow('Video', frame)
         
