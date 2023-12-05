@@ -1,4 +1,6 @@
-# Poseidon
+# Face-Recognizer
+
+Detect a custom folder of faces in a videostream using the MTCNN facial recognition package.
 
 To use:
 
