@@ -4,10 +4,10 @@ Detect specific faces from a videostream and save unknown faces using facial rec
 
 To use:
 
-1. `git clone https://github.com/darshg321/poseidon.git`
-2. `cd poseidon`
+1. `git clone https://github.com/darshg321/Face-Recognizer.git`
+2. `cd face-recognizer`
 3. `pip install -r requirements.txt`
-4. `python poseidon.py`
+4. `python main.py`
 
 Green box around a face means it's in sample_images, red means it's new
 Known faces will be saved with name of the original face in sample_images + number, unknown faces will be saved with unknown + number

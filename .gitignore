@@ -15,5 +15,6 @@ pyvenv.cfg
 dashboard/
 
 saved_faces/*
+!saved_faces/.gitkeep
 
 __pycache__/
