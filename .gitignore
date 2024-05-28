@@ -1,18 +1,19 @@
-Lib
+Lib/
 
-phonecamapi
+phonecamapi/
 
-Include
+Include/
 
-Scripts
+Scripts/
 
-share
+share/
 
-.vscode
+.vscode/
 
 pyvenv.cfg
 
-dashboard
+dashboard/
 
 saved_faces/*
-!saved_faces/.gitkeep
+
+__pycache__/

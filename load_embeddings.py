@@ -46,8 +46,8 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
     ]
     
     # if there are less files than the load amount, raise an exception
-    if len(filtered_files) < load_amount:
-        raise Exception(f'Supported files in the images folder lower than load amount, supported amount: {len(filtered_files)}, load amount: {load_amount}')
+    # if len(filtered_files) < load_amount:
+    #     raise Exception(f'Supported files in the images folder lower than load amount, supported amount: {len(filtered_files)}, load amount: {load_amount}')
     
     images_embeddings: dict = {}
     for i, file in enumerate(filtered_files, start = 1):
