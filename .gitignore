@@ -17,4 +17,7 @@ dashboard/
 saved_faces/*
 !saved_faces/.gitkeep
 
+live_detected/*
+!live_detected/.gitkeep
+
 __pycache__/

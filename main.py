@@ -77,6 +77,15 @@ def cl_args():
             "Higher values mean looser comparing, with a max of 1. Default is 0.4."
         ),
     )
+    parser.add_argument(
+        "--min_live_area",
+        type=int,
+        help=(
+            "Minimum face area (in pixels^2) required to add a new, "
+            "previously unrecognized face into live_detected. "
+            "Default is 4900 (70x70)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -86,6 +95,7 @@ def cl_args():
     video_file = args.video_path
     min_probability = args.min_probability
     max_distance = args.max_distance
+    min_live_area = args.min_live_area
 
     allowed_video_extensions = [".mkv", ".mp4", ".avi", ".mov", ".wmv"]
 
@@ -98,6 +108,7 @@ def cl_args():
             args.video_path,
             args.min_probability,
             args.max_distance,
+            args.min_live_area,
         ]
     )
 
@@ -108,6 +119,7 @@ def cl_args():
         video_file = 0 if use_webcam else "./faceexamplevideo.mkv"
         min_probability = 0.95
         max_distance = 0.4
+        min_live_area = 70 * 70
         print("Args not specified, using example values")
     else:
         # some config was provided -> enforce required ones
@@ -124,6 +136,9 @@ def cl_args():
     if max_distance is None:
         max_distance = 0.4
 
+    if min_live_area is None:
+        min_live_area = 70 * 70
+
     # validate only when using a file, not webcam
     if not use_webcam:
         if not os.path.exists(video_file):
@@ -131,12 +146,21 @@ def cl_args():
         if not any(video_file.endswith(ext) for ext in allowed_video_extensions):
             raise Exception("Video file extension not supported")
 
-    return images_to_load, images_path, video_file, min_probability, max_distance, use_webcam
+    return (
+        images_to_load,
+        images_path,
+        video_file,
+        min_probability,
+        max_distance,
+        use_webcam,
+        min_live_area,
+    )
 
 
 # --------------------------------------------------------------------------------------
 # Saving faces (from save_face.py)
 # --------------------------------------------------------------------------------------
+
 
 def save_face(face_image, match_file):
     """Save a detected face image to disk. Never raises; logs on failure."""
@@ -150,13 +174,100 @@ def save_face(face_image, match_file):
         # ensure output directory exists
         os.makedirs("./saved_faces", exist_ok=True)
 
-        filename = f"./saved_faces/{match_file}_{randint(1, 1000)}.jpg"
+        filename = f"./saved_faces/{match_file}_{randint(1, 10000)}.jpg"
         face_image.save(filename)
 
         return filename
     except Exception as e:
         log_error("Failed to save face image", e)
         return None
+
+
+def save_unrecognized_face_and_add_embedding(
+    face_image, face_embedding, embeddings: dict, live_dir: str = "./live_detected"
+):
+    """
+    Save an unrecognized face into live_detected as person[n+1].jpg and
+    immediately add its embedding into the in-memory embeddings dict so that
+    the same person is recognized in subsequent frames.
+    """
+    try:
+        # ensure output directory exists
+        os.makedirs(live_dir, exist_ok=True)
+
+        # count existing image files to determine the next index
+        allowed_exts = (".jpg", ".jpeg", ".png")
+        existing_files = [
+            f
+            for f in os.listdir(live_dir)
+            if os.path.isfile(os.path.join(live_dir, f))
+            and f.lower().endswith(allowed_exts)
+        ]
+        next_index = len(existing_files) + 1
+
+        filename = os.path.join(live_dir, f"person{next_index}.jpg")
+
+        # save the face image
+        face_image = Image.fromarray(face_image)
+        face_image.save(filename)
+
+        # add this new face to embeddings so it becomes recognized next time
+        if face_embedding is not None:
+            try:
+                face_embedding_tuple = tuple(face_embedding.tolist())
+                embeddings[face_embedding_tuple] = filename
+            except Exception as e:
+                log_error(
+                    "Failed to add live embedding for unrecognized face", e
+                )
+
+        return filename
+    except Exception as e:
+        log_error("Failed to save unrecognized face to live_detected", e)
+        return None
+
+
+def is_face_high_quality_for_live_detect(
+    face_image,
+    face_area: int,
+    min_live_area: int,
+    sharpness_threshold: float = 100.0,
+):
+    """
+    Return True if this face crop is good enough to be stored in live_detected.
+    Heuristics:
+    - must be at least min_live_area pixels in area
+    - must be reasonably sharp (Laplacian variance above threshold)
+    - must have a non-extreme aspect ratio (rough proxy for straight-ish angle)
+    """
+    try:
+        # area check
+        if face_area < min_live_area:
+            return False
+
+        if face_image is None or face_image.size == 0:
+            return False
+
+        h, w = face_image.shape[:2]
+        if h == 0 or w == 0:
+            return False
+
+        # very wide or very tall crops are often partial/profile faces
+        aspect_ratio = w / float(h)
+        if aspect_ratio < 0.6 or aspect_ratio > 1.8:
+            return False
+
+        # blur / sharpness check using variance of Laplacian
+        # (larger variance => sharper image)
+        gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
+        lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+        if lap_var < sharpness_threshold:
+            return False
+
+        return True
+    except Exception as e:
+        log_error("Error during face quality evaluation", e)
+        return False
 
 
 # --------------------------------------------------------------------------------------
@@ -300,6 +411,7 @@ def main():
             min_probability,
             max_distance,
             use_webcam,
+            min_live_area,
         ) = cl_args()
     except Exception as e:
         log_error("Failed to parse command-line arguments", e)
@@ -354,6 +466,7 @@ def main():
                     # MTCNN returns [x1, y1, x2, y2]
                     x1, y1, x2, y2 = box.astype(int)
                     face = rgb_frame[y1:y2, x1:x2]
+                    face_area = max(0, x2 - x1) * max(0, y2 - y1)
                     face_embedding = get_embedding(face)
 
                     if face_embedding is None:
@@ -376,14 +489,35 @@ def main():
                             frame, (x1, y1), (x2, y2), (0, 255, 0), 2
                         )
                     else:
-                        match_file = False
                         cv2.rectangle(
                             frame, (x1, y1), (x2, y2), (0, 0, 255), 2
                         )
-
-                    face_file = save_face(face, match_file)
-                    if face_file:
-                        print(f"Face saved to {face_file}")
+                        # Unrecognized face: only add to live_detected if it passes
+                        # quality checks (size, sharpness, rough frontal angle).
+                        # We still always *try* to recognize every face above via
+                        # embeddings, even if we don't store it.
+                        if is_face_high_quality_for_live_detect(
+                            face, face_area, min_live_area
+                        ):
+                            face_file = save_unrecognized_face_and_add_embedding(
+                                face, face_embedding, embeddings
+                            )
+                            if face_file:
+                                print(
+                                    f"Unrecognized face saved to {face_file} "
+                                    f"(area={face_area}px²)"
+                                )
+                        else:
+                            print(
+                                "Unrecognized face rejected for live_detect "
+                                f"(area={face_area}px², min_area={min_live_area}px², "
+                                "likely blurry/partial/profile)."
+                            )
+                    if match_info:
+                        # Optionally keep saving recognized faces as before
+                        face_file = save_face(face, match_file)
+                        if face_file:
+                            print(f"Face saved to {face_file}")
 
             cv2.imshow("Video", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
