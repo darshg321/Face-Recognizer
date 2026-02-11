@@ -1,6 +1,6 @@
 # Face-Recognizer
 
-Detect specific faces from a videostream and save unknown faces using facial recognition.
+Detect specific faces from a videostream or webcam and save unknown faces using facial recognition, full 1984-style.
 
 To use:
 
@@ -10,7 +10,7 @@ To use:
 4. `python main.py`
 
 Green box around a face means it's in sample_images, red means it's new
-Known faces will be saved with name of the original face in sample_images + number, unknown faces will be saved with unknown + number
+Known faces will be saved with name of the original face in sample_images + number, unknown faces will be saved with person + number
 
 Args:
 

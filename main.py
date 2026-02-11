@@ -10,26 +10,15 @@ from facenet_pytorch import InceptionResnetV1, MTCNN
 from scipy.spatial.distance import cosine
 from torch.cuda import is_available
 
-
 def log_error(message: str, exc: Exception | None = None) -> None:
     """Print non-fatal errors in a consistent way."""
     print(f"[ERROR] {message}")
     if exc is not None:
         print(f"        {type(exc).__name__}: {exc}")
 
-
-# --------------------------------------------------------------------------------------
-# Combined configuration and models (from common_imports.py)
-# --------------------------------------------------------------------------------------
-
 facenet_model = InceptionResnetV1(pretrained="vggface2").eval()
 device = "cuda" if is_available() else "cpu"
 mtcnn = MTCNN(device=device)
-
-
-# --------------------------------------------------------------------------------------
-# Argument parsing (from cl_args.py)
-# --------------------------------------------------------------------------------------
 
 def cl_args():
     parser = argparse.ArgumentParser(
@@ -156,12 +145,6 @@ def cl_args():
         min_live_area,
     )
 
-
-# --------------------------------------------------------------------------------------
-# Saving faces (from save_face.py)
-# --------------------------------------------------------------------------------------
-
-
 def save_face(face_image, match_file):
     """Save a detected face image to disk. Never raises; logs on failure."""
     try:
@@ -181,7 +164,6 @@ def save_face(face_image, match_file):
     except Exception as e:
         log_error("Failed to save face image", e)
         return None
-
 
 def save_unrecognized_face_and_add_embedding(
     face_image, face_embedding, embeddings: dict, live_dir: str = "./live_detected"
@@ -226,7 +208,6 @@ def save_unrecognized_face_and_add_embedding(
         log_error("Failed to save unrecognized face to live_detected", e)
         return None
 
-
 def is_face_high_quality_for_live_detect(
     face_image,
     face_area: int,
@@ -269,11 +250,6 @@ def is_face_high_quality_for_live_detect(
         log_error("Error during face quality evaluation", e)
         return False
 
-
-# --------------------------------------------------------------------------------------
-# Embedding extraction (from get_embedding.py)
-# --------------------------------------------------------------------------------------
-
 def get_embedding(face):
     """Return embedding for a single face crop. Returns None on any failure."""
     # face is an RGB frame
@@ -293,11 +269,6 @@ def get_embedding(face):
     except Exception as e:
         log_error("Error during embedding computation", e)
         return None
-
-
-# --------------------------------------------------------------------------------------
-# Face matching (from face_matching.py)
-# --------------------------------------------------------------------------------------
 
 def face_matching(face_embedding, embeddings: list | dict, similarity_threshold: float):
     """
@@ -320,11 +291,6 @@ def face_matching(face_embedding, embeddings: list | dict, similarity_threshold:
             return info
 
     return False
-
-
-# --------------------------------------------------------------------------------------
-# Loading embeddings from images (from load_embeddings.py)
-# --------------------------------------------------------------------------------------
 
 def load_embeddings(load_amount: int, images_path: str) -> dict:
     """
@@ -396,11 +362,6 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
         log_error("No valid face embeddings were loaded")
 
     return images_embeddings
-
-
-# --------------------------------------------------------------------------------------
-# Main video processing loop (original main.py logic)
-# --------------------------------------------------------------------------------------
 
 def main():
     try:
@@ -531,7 +492,6 @@ def main():
 
     video_capture.release()
     cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     try:
