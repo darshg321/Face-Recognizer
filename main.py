@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import argparse
 import os
+import tkinter as tk
 from random import randint
 
 import cv2
@@ -20,125 +20,112 @@ facenet_model = InceptionResnetV1(pretrained="vggface2").eval()
 device = "cuda" if is_available() else "cpu"
 mtcnn = MTCNN(device=device)
 
-def cl_args():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Find faces in a video and compare them to images of faces.\n"
-            "Supported image formats: .jpg, .jpeg, .png."
-        )
-    )
-    parser.add_argument(
-        "--images_path",
-        type=str,
-        help="The path to the sample images folder",
-    )
-    parser.add_argument(
-        "--load_amount",
-        type=int,
-        help=(
-            "The amount of images to load after filtering out unsupported "
-            "formats. Default is 10."
-        ),
-    )
-    parser.add_argument(
-        "--video_path",
-        type=str,
-        help="The video file. Supported formats: .mkv, .mp4, .avi, .mov, .wmv.",
-    )
-    parser.add_argument(
-        "--use_webcam",
-        action="store_true",
-        help="Use the default webcam instead of a video file. If set, --video_path is ignored.",
-    )
-    parser.add_argument(
-        "--min_probability",
-        type=float,
-        help=(
-            "The minimum probability for a face to be detected. Default is 0.95.\n"
-            "Max is 1. Higher values mean more strict detection."
-        ),
-    )
-    parser.add_argument(
-        "--max_distance",
-        type=float,
-        help=(
-            "The threshold for the distance of faces when comparing faces.\n"
-            "Higher values mean looser comparing, with a max of 1. Default is 0.4."
-        ),
-    )
-    parser.add_argument(
-        "--min_live_area",
-        type=int,
-        help=(
-            "Minimum face area (in pixels^2) required to add a new, "
-            "previously unrecognized face into live_detected. "
-            "Default is 4900 (70x70)."
-        ),
-    )
+def load_settings_from_file(path: str = "educational.txt") -> list[dict]:
+    """
+    Parse educational.txt and return a list of setting dicts.
+    Each line is: name|default|description
+    """
+    settings = []
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split("|", 2)
+                if len(parts) == 3:
+                    settings.append({
+                        "name": parts[0],
+                        "default": parts[1],
+                        "description": parts[2],
+                    })
+    except Exception as e:
+        log_error("Failed to load educational.txt", e)
+    return settings
 
-    args = parser.parse_args()
 
-    use_webcam = args.use_webcam
-    images_to_load = args.load_amount
-    images_path = args.images_path
-    video_file = args.video_path
-    min_probability = args.min_probability
-    max_distance = args.max_distance
-    min_live_area = args.min_live_area
+def settings_gui(settings: list[dict]) -> dict | None:
+    """
+    Display a minimal tkinter GUI with the settings from educational.txt.
+    Returns a dict of {name: value} when the user clicks Start,
+    or None if the window is closed.
+    """
+    result = {}
+    root = tk.Tk()
+    root.title("Face Recognizer Settings")
 
-    allowed_video_extensions = [".mkv", ".mp4", ".avi", ".mov", ".wmv"]
+    entries = {}
+    for i, setting in enumerate(settings):
+        label = tk.Label(root, text=f"{setting['name']}:", anchor="w")
+        label.grid(row=i, column=0, sticky="w", padx=5, pady=2)
 
-    # if no config args are specified, use example values
-    user_provided_any_config = any(
-        arg is not None
-        for arg in [
-            args.images_path,
-            args.load_amount,
-            args.video_path,
-            args.min_probability,
-            args.max_distance,
-            args.min_live_area,
-        ]
-    )
+        if setting["default"] in ("True", "False"):
+            var = tk.BooleanVar(value=setting["default"] == "True")
+            widget = tk.Checkbutton(root, variable=var)
+            widget.grid(row=i, column=1, sticky="w", padx=5, pady=2)
+            entries[setting["name"]] = var
+        else:
+            entry = tk.Entry(root, width=40)
+            entry.insert(0, setting["default"])
+            entry.grid(row=i, column=1, sticky="w", padx=5, pady=2)
+            entries[setting["name"]] = entry
 
-    if not user_provided_any_config:
-        images_to_load = 10
-        images_path = "./sample_images/"
-        # default source: example video, unless webcam explicitly requested
-        video_file = 0 if use_webcam else "./faceexamplevideo.mkv"
-        min_probability = 0.95
-        max_distance = 0.4
-        min_live_area = 70 * 70
-        print("Args not specified, using example values")
+        desc = tk.Label(root, text=setting["description"], fg="gray",
+                        wraplength=300, anchor="w", justify="left")
+        desc.grid(row=i, column=2, sticky="w", padx=5, pady=2)
+
+    def on_start():
+        for name, widget in entries.items():
+            if isinstance(widget, tk.BooleanVar):
+                result[name] = widget.get()
+            else:
+                result[name] = widget.get()
+        root.destroy()
+
+    start_btn = tk.Button(root, text="Start", command=on_start)
+    start_btn.grid(row=len(settings), column=1, pady=10)
+
+    root.protocol("WM_DELETE_WINDOW", root.destroy)
+    root.mainloop()
+
+    return result if result else None
+
+
+def get_settings() -> tuple:
+    """
+    Load settings from educational.txt, show the GUI, and return
+    the validated settings tuple.
+    """
+    settings = load_settings_from_file()
+    if not settings:
+        raise Exception("No settings found in educational.txt")
+
+    values = settings_gui(settings)
+    if values is None:
+        raise Exception("Settings window was closed without starting")
+
+    images_path = values.get("images_path", "./sample_images/")
+    images_to_load = int(values.get("load_amount", "10"))
+    video_path = values.get("video_path", "./faceexamplevideo.mkv")
+    use_webcam = values.get("use_webcam", False)
+    min_probability = float(values.get("min_probability", "0.95"))
+    max_distance = float(values.get("max_distance", "0.4"))
+    min_live_area = int(values.get("min_live_area", "4900"))
+
+    if use_webcam:
+        video_source = 0
     else:
-        # some config was provided -> enforce required ones
-        if images_path is None or images_to_load is None or (
-            video_file is None and not use_webcam
-        ):
-            parser.error("Missing required arguments")
-        if use_webcam:
-            video_file = 0
-
-    if min_probability is None:
-        min_probability = 0.95
-
-    if max_distance is None:
-        max_distance = 0.4
-
-    if min_live_area is None:
-        min_live_area = 70 * 70
-
-    # validate only when using a file, not webcam
-    if not use_webcam:
-        if not os.path.exists(video_file):
+        allowed_video_extensions = [".mkv", ".mp4", ".avi", ".mov", ".wmv"]
+        if not os.path.exists(video_path):
             raise Exception("Video file does not exist")
-        if not any(video_file.endswith(ext) for ext in allowed_video_extensions):
+        if not any(video_path.endswith(ext) for ext in allowed_video_extensions):
             raise Exception("Video file extension not supported")
+        video_source = video_path
 
     return (
         images_to_load,
         images_path,
-        video_file,
+        video_source,
         min_probability,
         max_distance,
         use_webcam,
@@ -325,10 +312,7 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
         file
         for file in os.listdir(images_path)
         if os.path.isfile(os.path.join(images_path, file))
-        and (
-            any(file.endswith(ext) for ext in allowed_image_extensions)
-            or print(f"File format not supported: {file}")
-        )
+        and any(file.endswith(ext) for ext in allowed_image_extensions)
     ]
 
     images_embeddings: dict = {}
@@ -352,9 +336,6 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
         try:
             face_embedding_tuple = tuple(face_embedding.tolist())
             images_embeddings[face_embedding_tuple] = file
-            print(
-                f"Loaded face {len(images_embeddings)}: file {images_path + file}"
-            )
         except Exception as e:
             log_error(f"Failed to store embedding for image {file}", e)
 
@@ -373,9 +354,9 @@ def main():
             max_distance,
             use_webcam,
             min_live_area,
-        ) = cl_args()
+        ) = get_settings()
     except Exception as e:
-        log_error("Failed to parse command-line arguments", e)
+        log_error("Failed to get settings", e)
         return
 
     try:
@@ -383,8 +364,6 @@ def main():
     except Exception as e:
         log_error("Failed to load embeddings", e)
         embeddings = {}
-
-    print("Finished loading faces")
 
     if not embeddings:
         print(
@@ -404,9 +383,6 @@ def main():
             ret, frame = video_capture.read()
             frame_count += 1
             if not ret:
-                print(
-                    f"Error loading video or video file ended (Frame: {frame_count})"
-                )
                 break
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -441,11 +417,6 @@ def main():
 
                     if match_info:
                         cosine_similarity, embedding_index, match_file = match_info
-                        print(
-                            f"A face matched with {cosine_similarity}% distance "
-                            f"from embedding {embedding_index} in list (File: {match_file})"
-                        )
-                        print(f"Match found at frame {frame_count}")
                         cv2.rectangle(
                             frame, (x1, y1), (x2, y2), (0, 255, 0), 2
                         )
@@ -453,32 +424,14 @@ def main():
                         cv2.rectangle(
                             frame, (x1, y1), (x2, y2), (0, 0, 255), 2
                         )
-                        # Unrecognized face: only add to live_detected if it passes
-                        # quality checks (size, sharpness, rough frontal angle).
-                        # We still always *try* to recognize every face above via
-                        # embeddings, even if we don't store it.
                         if is_face_high_quality_for_live_detect(
                             face, face_area, min_live_area
                         ):
-                            face_file = save_unrecognized_face_and_add_embedding(
+                            save_unrecognized_face_and_add_embedding(
                                 face, face_embedding, embeddings
                             )
-                            if face_file:
-                                print(
-                                    f"Unrecognized face saved to {face_file} "
-                                    f"(area={face_area}px²)"
-                                )
-                        else:
-                            print(
-                                "Unrecognized face rejected for live_detect "
-                                f"(area={face_area}px², min_area={min_live_area}px², "
-                                "likely blurry/partial/profile)."
-                            )
                     if match_info:
-                        # Optionally keep saving recognized faces as before
-                        face_file = save_face(face, match_file)
-                        if face_file:
-                            print(f"Face saved to {face_file}")
+                        save_face(face, match_file)
 
             cv2.imshow("Video", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
