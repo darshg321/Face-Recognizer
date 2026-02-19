@@ -15,12 +15,15 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QSizePolicy,
+    QSpacerItem,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -351,6 +354,109 @@ class VideoThread(QThread):
 
 
 # ---------------------------------------------------------------------------
+# Slideshow widget
+# ---------------------------------------------------------------------------
+
+SLIDESHOW_SLIDES = [
+    {
+        "title": "Welcome to Face Recognizer",
+        "body": (
+            "This application uses deep learning to detect and recognize faces "
+            "in real-time video streams. Press Start on the settings panel to begin."
+        ),
+    },
+    {
+        "title": "How It Works",
+        "body": (
+            "Faces are detected using MTCNN and encoded with a FaceNet model. "
+            "Each detected face is compared against a database of known embeddings "
+            "to find the closest match."
+        ),
+    },
+    {
+        "title": "Live Detection",
+        "body": (
+            "Unrecognized faces that meet quality thresholds are automatically saved "
+            "to the live_detected folder so they can be recognized in future frames."
+        ),
+    },
+]
+
+
+class SlideshowWidget(QWidget):
+    """A simple slideshow displaying a title, image placeholder, and paragraph."""
+
+    def __init__(self, slides: list[dict] | None = None, parent=None):
+        super().__init__(parent)
+        self.slides = slides or SLIDESHOW_SLIDES
+        self._current = 0
+        self._build_ui()
+        self._show_slide(0)
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        # Title
+        self.title_label = QLabel()
+        self.title_label.setWordWrap(True)
+        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.addWidget(self.title_label)
+
+        # Image placeholder (a bordered box)
+        self.image_label = QLabel()
+        self.image_label.setFixedSize(260, 180)
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setFrameShape(QFrame.Box)
+        self.image_label.setStyleSheet(
+            "background-color: #e0e0e0; color: #888; font-size: 13px; border: 2px solid #aaa;"
+        )
+        self.image_label.setText("[ Image Placeholder ]")
+        layout.addWidget(self.image_label, alignment=Qt.AlignHCenter)
+
+        # Body text
+        self.body_label = QLabel()
+        self.body_label.setWordWrap(True)
+        self.body_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.body_label.setStyleSheet("font-size: 13px;")
+        layout.addWidget(self.body_label)
+
+        # Push arrows to the bottom-right
+        layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        arrow_layout = QHBoxLayout()
+        arrow_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        self.prev_btn = QPushButton("\u25C0")
+        self.prev_btn.setFixedSize(36, 36)
+        self.prev_btn.clicked.connect(self._prev_slide)
+        arrow_layout.addWidget(self.prev_btn)
+
+        self.next_btn = QPushButton("\u25B6")
+        self.next_btn.setFixedSize(36, 36)
+        self.next_btn.clicked.connect(self._next_slide)
+        arrow_layout.addWidget(self.next_btn)
+
+        layout.addLayout(arrow_layout)
+
+    def _show_slide(self, index: int):
+        if not self.slides:
+            return
+        self._current = index % len(self.slides)
+        slide = self.slides[self._current]
+        self.title_label.setText(slide.get("title", ""))
+        self.body_label.setText(slide.get("body", ""))
+
+    def _prev_slide(self):
+        self._show_slide(self._current - 1)
+
+    def _next_slide(self):
+        self._show_slide(self._current + 1)
+
+
+# ---------------------------------------------------------------------------
 # Main window
 # ---------------------------------------------------------------------------
 
@@ -447,6 +553,10 @@ class MainWindow(QMainWindow):
 
         right_panel.addLayout(btn_layout)
         layout.addLayout(right_panel, stretch=1)
+
+        # Far-right: slideshow panel
+        self.slideshow = SlideshowWidget()
+        layout.addWidget(self.slideshow, stretch=1)
 
     def _load_defaults(self):
         """Populate widgets with defaults from educational.txt."""
@@ -559,7 +669,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.resize(1100, 600)
+    window.resize(1400, 700)
     window.show()
     sys.exit(app.exec_())
 
