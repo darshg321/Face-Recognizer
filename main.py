@@ -1,14 +1,34 @@
 from __future__ import annotations
 
-import argparse
 import os
+import sys
+import threading
 from random import randint
 
 import cv2
+import numpy as np
 from PIL import Image
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 from facenet_pytorch import InceptionResnetV1, MTCNN
 from scipy.spatial.distance import cosine
 from torch.cuda import is_available
+
 
 def log_error(message: str, exc: Exception | None = None) -> None:
     """Print non-fatal errors in a consistent way."""
@@ -16,145 +36,44 @@ def log_error(message: str, exc: Exception | None = None) -> None:
     if exc is not None:
         print(f"        {type(exc).__name__}: {exc}")
 
+
 facenet_model = InceptionResnetV1(pretrained="vggface2").eval()
 device = "cuda" if is_available() else "cpu"
 mtcnn = MTCNN(device=device)
 
-def cl_args():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Find faces in a video and compare them to images of faces.\n"
-            "Supported image formats: .jpg, .jpeg, .png."
-        )
-    )
-    parser.add_argument(
-        "--images_path",
-        type=str,
-        help="The path to the sample images folder",
-    )
-    parser.add_argument(
-        "--load_amount",
-        type=int,
-        help=(
-            "The amount of images to load after filtering out unsupported "
-            "formats. Default is 10."
-        ),
-    )
-    parser.add_argument(
-        "--video_path",
-        type=str,
-        help="The video file. Supported formats: .mkv, .mp4, .avi, .mov, .wmv.",
-    )
-    parser.add_argument(
-        "--use_webcam",
-        action="store_true",
-        help="Use the default webcam instead of a video file. If set, --video_path is ignored.",
-    )
-    parser.add_argument(
-        "--min_probability",
-        type=float,
-        help=(
-            "The minimum probability for a face to be detected. Default is 0.95.\n"
-            "Max is 1. Higher values mean more strict detection."
-        ),
-    )
-    parser.add_argument(
-        "--max_distance",
-        type=float,
-        help=(
-            "The threshold for the distance of faces when comparing faces.\n"
-            "Higher values mean looser comparing, with a max of 1. Default is 0.4."
-        ),
-    )
-    parser.add_argument(
-        "--min_live_area",
-        type=int,
-        help=(
-            "Minimum face area (in pixels^2) required to add a new, "
-            "previously unrecognized face into live_detected. "
-            "Default is 4900 (70x70)."
-        ),
-    )
 
-    args = parser.parse_args()
+def load_settings_from_file(path: str = "educational.txt") -> list[dict]:
+    """
+    Parse educational.txt and return a list of setting dicts.
+    Each line is: name|default|description
+    """
+    settings = []
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split("|", 2)
+                if len(parts) == 3:
+                    settings.append({
+                        "name": parts[0],
+                        "default": parts[1],
+                        "description": parts[2],
+                    })
+    except Exception as e:
+        log_error("Failed to load educational.txt", e)
+    return settings
 
-    use_webcam = args.use_webcam
-    images_to_load = args.load_amount
-    images_path = args.images_path
-    video_file = args.video_path
-    min_probability = args.min_probability
-    max_distance = args.max_distance
-    min_live_area = args.min_live_area
-
-    allowed_video_extensions = [".mkv", ".mp4", ".avi", ".mov", ".wmv"]
-
-    # if no config args are specified, use example values
-    user_provided_any_config = any(
-        arg is not None
-        for arg in [
-            args.images_path,
-            args.load_amount,
-            args.video_path,
-            args.min_probability,
-            args.max_distance,
-            args.min_live_area,
-        ]
-    )
-
-    if not user_provided_any_config:
-        images_to_load = 10
-        images_path = "./sample_images/"
-        # default source: example video, unless webcam explicitly requested
-        video_file = 0 if use_webcam else "./faceexamplevideo.mkv"
-        min_probability = 0.95
-        max_distance = 0.4
-        min_live_area = 70 * 70
-        print("Args not specified, using example values")
-    else:
-        # some config was provided -> enforce required ones
-        if images_path is None or images_to_load is None or (
-            video_file is None and not use_webcam
-        ):
-            parser.error("Missing required arguments")
-        if use_webcam:
-            video_file = 0
-
-    if min_probability is None:
-        min_probability = 0.95
-
-    if max_distance is None:
-        max_distance = 0.4
-
-    if min_live_area is None:
-        min_live_area = 70 * 70
-
-    # validate only when using a file, not webcam
-    if not use_webcam:
-        if not os.path.exists(video_file):
-            raise Exception("Video file does not exist")
-        if not any(video_file.endswith(ext) for ext in allowed_video_extensions):
-            raise Exception("Video file extension not supported")
-
-    return (
-        images_to_load,
-        images_path,
-        video_file,
-        min_probability,
-        max_distance,
-        use_webcam,
-        min_live_area,
-    )
 
 def save_face(face_image, match_file):
     """Save a detected face image to disk. Never raises; logs on failure."""
     try:
-        # face_image needs to be array or PIL image
         face_image = Image.fromarray(face_image)
 
         if not match_file:
             match_file = "unknown"
 
-        # ensure output directory exists
         os.makedirs("./saved_faces", exist_ok=True)
 
         filename = f"./saved_faces/{match_file}_{randint(1, 10000)}.jpg"
@@ -165,6 +84,7 @@ def save_face(face_image, match_file):
         log_error("Failed to save face image", e)
         return None
 
+
 def save_unrecognized_face_and_add_embedding(
     face_image, face_embedding, embeddings: dict, live_dir: str = "./live_detected"
 ):
@@ -174,10 +94,8 @@ def save_unrecognized_face_and_add_embedding(
     the same person is recognized in subsequent frames.
     """
     try:
-        # ensure output directory exists
         os.makedirs(live_dir, exist_ok=True)
 
-        # count existing image files to determine the next index
         allowed_exts = (".jpg", ".jpeg", ".png")
         existing_files = [
             f
@@ -189,11 +107,9 @@ def save_unrecognized_face_and_add_embedding(
 
         filename = os.path.join(live_dir, f"person{next_index}.jpg")
 
-        # save the face image
         face_image = Image.fromarray(face_image)
         face_image.save(filename)
 
-        # add this new face to embeddings so it becomes recognized next time
         if face_embedding is not None:
             try:
                 face_embedding_tuple = tuple(face_embedding.tolist())
@@ -208,6 +124,7 @@ def save_unrecognized_face_and_add_embedding(
         log_error("Failed to save unrecognized face to live_detected", e)
         return None
 
+
 def is_face_high_quality_for_live_detect(
     face_image,
     face_area: int,
@@ -216,13 +133,8 @@ def is_face_high_quality_for_live_detect(
 ):
     """
     Return True if this face crop is good enough to be stored in live_detected.
-    Heuristics:
-    - must be at least min_live_area pixels in area
-    - must be reasonably sharp (Laplacian variance above threshold)
-    - must have a non-extreme aspect ratio (rough proxy for straight-ish angle)
     """
     try:
-        # area check
         if face_area < min_live_area:
             return False
 
@@ -233,13 +145,10 @@ def is_face_high_quality_for_live_detect(
         if h == 0 or w == 0:
             return False
 
-        # very wide or very tall crops are often partial/profile faces
         aspect_ratio = w / float(h)
         if aspect_ratio < 0.6 or aspect_ratio > 1.8:
             return False
 
-        # blur / sharpness check using variance of Laplacian
-        # (larger variance => sharper image)
         gray = cv2.cvtColor(face_image, cv2.COLOR_RGB2GRAY)
         lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         if lap_var < sharpness_threshold:
@@ -250,18 +159,16 @@ def is_face_high_quality_for_live_detect(
         log_error("Error during face quality evaluation", e)
         return False
 
+
 def get_embedding(face):
     """Return embedding for a single face crop. Returns None on any failure."""
-    # face is an RGB frame
     try:
         tensor_image = mtcnn(face)
     except Exception as e:
-        # This gracefully handles internal MTCNN errors like empty box lists.
         log_error("Error during face detection in get_embedding", e)
         return None
 
     if tensor_image is None:
-        # No face detected in this crop
         return None
 
     try:
@@ -270,18 +177,11 @@ def get_embedding(face):
         log_error("Error during embedding computation", e)
         return None
 
+
 def face_matching(face_embedding, embeddings: list | dict, similarity_threshold: float):
     """
-    Matches the face_embedding with the embeddings in the embeddings
-    and returns True if a match is found.
-
-    :param face_embedding: The MTCNN embedding of the face to match
-    :param embeddings: A dict of MTCNN embeddings of the faces to match with.
-                       The key has to be the embedding tuple, and the value the file name.
-    :param similarity_threshold: The threshold to match the face with
-    :return: A tuple containing the cosine similarity in percent, the index of the
-             embedding in the dict iteration and the name of the file if a match is found,
-             False otherwise.
+    Matches the face_embedding with the embeddings and returns match info
+    or False.
     """
     for i, embedding in enumerate(embeddings):
         cosine_similarity = cosine(face_embedding, embedding)
@@ -292,21 +192,11 @@ def face_matching(face_embedding, embeddings: list | dict, similarity_threshold:
 
     return False
 
+
 def load_embeddings(load_amount: int, images_path: str) -> dict:
     """
-    Loads the face embeddings from the images in the images_path folder
-    and returns a dict of the MTCNN embeddings, key being a tuple of the embeddings,
-    and value being the path of the image that corresponds.
-    If there's no face detected in the image, it will raise an exception.
-    Supported formats: .jpg, .jpeg, .png
-
-    :param load_amount: The amount of images to load after filtering out unsupported formats
-    :param images_path: The path to the images folder
-    :return: A dict of the MTCNN embeddings, key is a tuple of the embedding, value is the image path
-    NOTE: This function logs problems instead of raising, so that the app
-    can continue running even if some images are bad.
+    Loads the face embeddings from the images in the images_path folder.
     """
-
     try:
         if images_path[-1] != "/":
             images_path += "/"
@@ -320,15 +210,11 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
 
     allowed_image_extensions = ["jpg", "jpeg", "png"]
 
-    # filter the files, removing folders and extensions that aren't allowed
     filtered_files = [
         file
         for file in os.listdir(images_path)
         if os.path.isfile(os.path.join(images_path, file))
-        and (
-            any(file.endswith(ext) for ext in allowed_image_extensions)
-            or print(f"File format not supported: {file}")
-        )
+        and any(file.endswith(ext) for ext in allowed_image_extensions)
     ]
 
     images_embeddings: dict = {}
@@ -336,7 +222,6 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
         if i > load_amount:
             break
 
-        # load the image
         try:
             face = Image.open(images_path + file).convert("RGB")
         except Exception as e:
@@ -352,9 +237,6 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
         try:
             face_embedding_tuple = tuple(face_embedding.tolist())
             images_embeddings[face_embedding_tuple] = file
-            print(
-                f"Loaded face {len(images_embeddings)}: file {images_path + file}"
-            )
         except Exception as e:
             log_error(f"Failed to store embedding for image {file}", e)
 
@@ -363,135 +245,324 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
 
     return images_embeddings
 
-def main():
-    try:
-        (
-            images_to_load,
-            images_path,
-            video_source,
-            min_probability,
-            max_distance,
-            use_webcam,
-            min_live_area,
-        ) = cl_args()
-    except Exception as e:
-        log_error("Failed to parse command-line arguments", e)
-        return
 
-    try:
-        embeddings = load_embeddings(images_to_load, images_path)
-    except Exception as e:
-        log_error("Failed to load embeddings", e)
-        embeddings = {}
+# ---------------------------------------------------------------------------
+# Video processing thread
+# ---------------------------------------------------------------------------
 
-    print("Finished loading faces")
+class VideoThread(QThread):
+    """Runs video capture and face recognition in a separate thread."""
 
-    if not embeddings:
-        print(
-            "Warning: No embeddings loaded; face matching will be disabled. "
-            "Faces will still be detected and saved."
-        )
+    frame_ready = pyqtSignal(np.ndarray)
 
-    # video_source is either a path or a webcam index (0)
-    video_capture = cv2.VideoCapture(video_source)
-    if not video_capture.isOpened():
-        log_error(f"Unable to open video source: {video_source}")
-        return
-    frame_count = 0
+    def __init__(self, video_source, embeddings, settings, lock, parent=None):
+        super().__init__(parent)
+        self.video_source = video_source
+        self.embeddings = embeddings
+        self.settings = settings
+        self.lock = lock
+        self._running = True
 
-    while True:
-        try:
-            ret, frame = video_capture.read()
-            frame_count += 1
-            if not ret:
-                print(
-                    f"Error loading video or video file ended (Frame: {frame_count})"
-                )
-                break
+    def run(self):
+        video_capture = cv2.VideoCapture(self.video_source)
+        if not video_capture.isOpened():
+            log_error(f"Unable to open video source: {self.video_source}")
+            return
 
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            # Detect faces in the frame
+        frame_count = 0
+        while self._running:
             try:
-                boxes, probs = mtcnn.detect(rgb_frame)
+                ret, frame = video_capture.read()
+                frame_count += 1
+                if not ret:
+                    break
+
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                min_probability = self.settings.get("min_probability", 0.95)
+                max_distance = self.settings.get("max_distance", 0.4)
+                min_live_area = self.settings.get("min_live_area", 4900)
+
+                try:
+                    boxes, probs = mtcnn.detect(rgb_frame)
+                except Exception as e:
+                    log_error(
+                        f"Error during face detection on frame {frame_count}", e
+                    )
+                    boxes, probs = None, None
+
+                if boxes is not None:
+                    for box, prob in zip(boxes, probs):
+                        if prob < min_probability:
+                            continue
+                        x1, y1, x2, y2 = box.astype(int)
+                        face = rgb_frame[y1:y2, x1:x2]
+                        face_area = max(0, x2 - x1) * max(0, y2 - y1)
+                        face_embedding = get_embedding(face)
+
+                        if face_embedding is None:
+                            continue
+
+                        with self.lock:
+                            match_info = (
+                                face_matching(
+                                    face_embedding, self.embeddings, max_distance
+                                )
+                                if self.embeddings
+                                else None
+                            )
+
+                        if match_info:
+                            cosine_similarity, embedding_index, match_file = (
+                                match_info
+                            )
+                            cv2.rectangle(
+                                frame, (x1, y1), (x2, y2), (0, 255, 0), 2
+                            )
+                        else:
+                            cv2.rectangle(
+                                frame, (x1, y1), (x2, y2), (0, 0, 255), 2
+                            )
+                            if is_face_high_quality_for_live_detect(
+                                face, face_area, min_live_area
+                            ):
+                                with self.lock:
+                                    save_unrecognized_face_and_add_embedding(
+                                        face, face_embedding, self.embeddings
+                                    )
+                        if match_info:
+                            save_face(face, match_file)
+
+                # Convert BGR frame to RGB for Qt display
+                display_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                self.frame_ready.emit(display_frame)
+
             except Exception as e:
                 log_error(
-                    f"Error during face detection on frame {frame_count}", e
+                    f"Unexpected error in main loop at frame {frame_count}", e
                 )
-                boxes, probs = None, None
+                continue
 
-            if boxes is not None:
-                for box, prob in zip(boxes, probs):
-                    if prob < min_probability:
-                        continue
-                    # MTCNN returns [x1, y1, x2, y2]
-                    x1, y1, x2, y2 = box.astype(int)
-                    face = rgb_frame[y1:y2, x1:x2]
-                    face_area = max(0, x2 - x1) * max(0, y2 - y1)
-                    face_embedding = get_embedding(face)
+        video_capture.release()
 
-                    if face_embedding is None:
-                        continue
+    def stop(self):
+        self._running = False
+        self.wait()
 
-                    match_info = (
-                        face_matching(face_embedding, embeddings, max_distance)
-                        if embeddings
-                        else None
-                    )
 
-                    if match_info:
-                        cosine_similarity, embedding_index, match_file = match_info
-                        print(
-                            f"A face matched with {cosine_similarity}% distance "
-                            f"from embedding {embedding_index} in list (File: {match_file})"
-                        )
-                        print(f"Match found at frame {frame_count}")
-                        cv2.rectangle(
-                            frame, (x1, y1), (x2, y2), (0, 255, 0), 2
-                        )
-                    else:
-                        cv2.rectangle(
-                            frame, (x1, y1), (x2, y2), (0, 0, 255), 2
-                        )
-                        # Unrecognized face: only add to live_detected if it passes
-                        # quality checks (size, sharpness, rough frontal angle).
-                        # We still always *try* to recognize every face above via
-                        # embeddings, even if we don't store it.
-                        if is_face_high_quality_for_live_detect(
-                            face, face_area, min_live_area
-                        ):
-                            face_file = save_unrecognized_face_and_add_embedding(
-                                face, face_embedding, embeddings
-                            )
-                            if face_file:
-                                print(
-                                    f"Unrecognized face saved to {face_file} "
-                                    f"(area={face_area}px²)"
-                                )
-                        else:
-                            print(
-                                "Unrecognized face rejected for live_detect "
-                                f"(area={face_area}px², min_area={min_live_area}px², "
-                                "likely blurry/partial/profile)."
-                            )
-                    if match_info:
-                        # Optionally keep saving recognized faces as before
-                        face_file = save_face(face, match_file)
-                        if face_file:
-                            print(f"Face saved to {face_file}")
+# ---------------------------------------------------------------------------
+# Main window
+# ---------------------------------------------------------------------------
 
-            cv2.imshow("Video", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
+class MainWindow(QMainWindow):
+    """PyQt5 main window with video stream and live-adjustable settings."""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Face Recognizer")
+
+        self.video_thread: VideoThread | None = None
+        self.embeddings: dict = {}
+        self.embeddings_lock = threading.Lock()
+        self.settings: dict = {}
+        self._settings_data = load_settings_from_file()
+
+        self._build_ui()
+        self._load_defaults()
+
+    # -- UI construction ----------------------------------------------------
+
+    def _build_ui(self):
+        central = QWidget()
+        self.setCentralWidget(central)
+        layout = QHBoxLayout(central)
+
+        # Left: video display
+        self.video_label = QLabel("Press Start to begin")
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setMinimumSize(640, 480)
+        self.video_label.setStyleSheet("background-color: black; color: white;")
+        layout.addWidget(self.video_label, stretch=3)
+
+        # Right: settings panel
+        settings_group = QGroupBox("Settings")
+        form = QFormLayout()
+
+        self.images_path_edit = QLineEdit()
+        form.addRow("images_path:", self.images_path_edit)
+
+        self.load_amount_spin = QSpinBox()
+        self.load_amount_spin.setRange(1, 1000)
+        form.addRow("load_amount:", self.load_amount_spin)
+
+        self.video_path_edit = QLineEdit()
+        form.addRow("video_path:", self.video_path_edit)
+
+        self.use_webcam_check = QCheckBox()
+        form.addRow("use_webcam:", self.use_webcam_check)
+
+        self.min_probability_spin = QDoubleSpinBox()
+        self.min_probability_spin.setRange(0.0, 1.0)
+        self.min_probability_spin.setSingleStep(0.05)
+        self.min_probability_spin.setDecimals(2)
+        form.addRow("min_probability:", self.min_probability_spin)
+
+        self.max_distance_spin = QDoubleSpinBox()
+        self.max_distance_spin.setRange(0.0, 1.0)
+        self.max_distance_spin.setSingleStep(0.05)
+        self.max_distance_spin.setDecimals(2)
+        form.addRow("max_distance:", self.max_distance_spin)
+
+        self.min_live_area_spin = QSpinBox()
+        self.min_live_area_spin.setRange(0, 1000000)
+        form.addRow("min_live_area:", self.min_live_area_spin)
+
+        # Description labels loaded from educational.txt
+        for s in self._settings_data:
+            desc_label = QLabel(s["description"])
+            desc_label.setWordWrap(True)
+            desc_label.setStyleSheet("color: gray; font-size: 10px;")
+            form.addRow("", desc_label)
+
+        settings_group.setLayout(form)
+
+        right_panel = QVBoxLayout()
+        right_panel.addWidget(settings_group)
+
+        # Connect live-update signals for numeric settings
+        self.min_probability_spin.valueChanged.connect(self._apply_live_settings)
+        self.max_distance_spin.valueChanged.connect(self._apply_live_settings)
+        self.min_live_area_spin.valueChanged.connect(self._apply_live_settings)
+
+        # Start / Stop buttons
+        btn_layout = QHBoxLayout()
+        self.start_btn = QPushButton("Start")
+        self.start_btn.clicked.connect(self._on_start)
+        btn_layout.addWidget(self.start_btn)
+
+        self.stop_btn = QPushButton("Stop")
+        self.stop_btn.clicked.connect(self._on_stop)
+        self.stop_btn.setEnabled(False)
+        btn_layout.addWidget(self.stop_btn)
+
+        right_panel.addLayout(btn_layout)
+        layout.addLayout(right_panel, stretch=1)
+
+    def _load_defaults(self):
+        """Populate widgets with defaults from educational.txt."""
+        defaults = {s["name"]: s["default"] for s in self._settings_data}
+
+        self.images_path_edit.setText(defaults.get("images_path", "./sample_images/"))
+        self.load_amount_spin.setValue(int(defaults.get("load_amount", "10")))
+        self.video_path_edit.setText(
+            defaults.get("video_path", "./faceexamplevideo.mkv")
+        )
+        self.use_webcam_check.setChecked(defaults.get("use_webcam", "False") == "True")
+        self.min_probability_spin.setValue(
+            float(defaults.get("min_probability", "0.95"))
+        )
+        self.max_distance_spin.setValue(float(defaults.get("max_distance", "0.4")))
+        self.min_live_area_spin.setValue(int(defaults.get("min_live_area", "4900")))
+
+    # -- Settings helpers ---------------------------------------------------
+
+    def _read_settings(self) -> dict:
+        return {
+            "images_path": self.images_path_edit.text(),
+            "load_amount": self.load_amount_spin.value(),
+            "video_path": self.video_path_edit.text(),
+            "use_webcam": self.use_webcam_check.isChecked(),
+            "min_probability": self.min_probability_spin.value(),
+            "max_distance": self.max_distance_spin.value(),
+            "min_live_area": self.min_live_area_spin.value(),
+        }
+
+    def _apply_live_settings(self):
+        """Push changed numeric settings to the running thread."""
+        self.settings["min_probability"] = self.min_probability_spin.value()
+        self.settings["max_distance"] = self.max_distance_spin.value()
+        self.settings["min_live_area"] = self.min_live_area_spin.value()
+
+    # -- Start / Stop -------------------------------------------------------
+
+    def _on_start(self):
+        if self.video_thread and self.video_thread.isRunning():
+            return
+
+        self.settings = self._read_settings()
+
+        images_path = self.settings["images_path"]
+        load_amount = self.settings["load_amount"]
+
+        try:
+            self.embeddings = load_embeddings(load_amount, images_path)
         except Exception as e:
-            log_error(
-                f"Unexpected error in main loop at frame {frame_count}", e
-            )
-            # continue to next frame instead of crashing
-            continue
+            log_error("Failed to load embeddings", e)
+            self.embeddings = {}
 
-    video_capture.release()
-    cv2.destroyAllWindows()
+        if self.settings["use_webcam"]:
+            video_source = 0
+        else:
+            video_source = self.settings["video_path"]
+            allowed_video_extensions = [".mkv", ".mp4", ".avi", ".mov", ".wmv"]
+            if not os.path.exists(video_source):
+                log_error("Video file does not exist")
+                return
+            if not any(video_source.endswith(ext) for ext in allowed_video_extensions):
+                log_error("Video file extension not supported")
+                return
+
+        self.video_thread = VideoThread(
+            video_source, self.embeddings, self.settings, self.embeddings_lock
+        )
+        self.video_thread.frame_ready.connect(self._update_frame)
+        self.video_thread.finished.connect(self._on_thread_finished)
+        self.video_thread.start()
+
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+
+    def _on_stop(self):
+        if self.video_thread:
+            self.video_thread.stop()
+            self.video_thread = None
+
+        self.video_label.setText("Stopped")
+        self.start_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+
+    def _on_thread_finished(self):
+        self.start_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.video_label.setText("Stream ended")
+
+    # -- Frame display ------------------------------------------------------
+
+    @pyqtSlot(np.ndarray)
+    def _update_frame(self, rgb_frame: np.ndarray):
+        """Convert a numpy RGB frame to QPixmap and display it."""
+        h, w, ch = rgb_frame.shape
+        bytes_per_line = ch * w
+        q_img = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(q_img).scaled(
+            self.video_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        self.video_label.setPixmap(pixmap)
+
+    # -- Cleanup ------------------------------------------------------------
+
+    def closeEvent(self, event):
+        self._on_stop()
+        event.accept()
+
+
+def main():
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(1100, 600)
+    window.show()
+    sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     try:
