@@ -1,7 +1,0 @@
-images_path|./sample_images/|The path to the folder containing sample face images (jpg, jpeg, png).
-load_amount|10|The number of images to load from the sample images folder.
-video_path|./faceexamplevideo.mkv|The video file to process (mkv, mp4, avi, mov, wmv). Ignored when using webcam.
-use_webcam|False|Use the default webcam instead of a video file.
-min_probability|0.95|Minimum confidence for a face to be detected (0 to 1). Higher is stricter.
-max_distance|0.4|Threshold for face similarity when comparing (0 to 1). Lower is stricter.
-min_live_area|4900|Minimum face area in pixels squared to save an unrecognized face.
