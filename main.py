@@ -402,12 +402,12 @@ class SlideshowWidget(QWidget):
         self.title_label = QLabel()
         self.title_label.setWordWrap(True)
         self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.title_label.setStyleSheet("font-size: 18px; font-weight: bold;")
+        self.title_label.setStyleSheet("font-size: 22px; font-weight: bold;")
         layout.addWidget(self.title_label)
 
         # Image placeholder (a bordered box)
         self.image_label = QLabel()
-        self.image_label.setFixedSize(260, 180)
+        self.image_label.setFixedSize(480, 320)
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setFrameShape(QFrame.Box)
         self.image_label.setStyleSheet(
@@ -420,7 +420,7 @@ class SlideshowWidget(QWidget):
         self.body_label = QLabel()
         self.body_label.setWordWrap(True)
         self.body_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.body_label.setStyleSheet("font-size: 13px;")
+        self.body_label.setStyleSheet("font-size: 15px;")
         layout.addWidget(self.body_label)
 
         # Push arrows to the bottom-right
@@ -483,14 +483,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
 
-        # Left: video display
-        self.video_label = QLabel("Press Start to begin")
-        self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.setMinimumSize(640, 480)
-        self.video_label.setStyleSheet("background-color: black; color: white;")
-        layout.addWidget(self.video_label, stretch=3)
-
-        # Right: settings panel
+        # Left: settings panel
         settings_group = QGroupBox("Settings")
         form = QFormLayout()
 
@@ -523,17 +516,10 @@ class MainWindow(QMainWindow):
         self.min_live_area_spin.setRange(0, 1000000)
         form.addRow("min_live_area:", self.min_live_area_spin)
 
-        # Description labels loaded from educational.txt
-        for s in self._settings_data:
-            desc_label = QLabel(s["description"])
-            desc_label.setWordWrap(True)
-            desc_label.setStyleSheet("color: gray; font-size: 10px;")
-            form.addRow("", desc_label)
-
         settings_group.setLayout(form)
 
-        right_panel = QVBoxLayout()
-        right_panel.addWidget(settings_group)
+        left_panel = QVBoxLayout()
+        left_panel.addWidget(settings_group)
 
         # Connect live-update signals for numeric settings
         self.min_probability_spin.valueChanged.connect(self._apply_live_settings)
@@ -551,12 +537,19 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(False)
         btn_layout.addWidget(self.stop_btn)
 
-        right_panel.addLayout(btn_layout)
-        layout.addLayout(right_panel, stretch=1)
+        left_panel.addLayout(btn_layout)
+        layout.addLayout(left_panel, stretch=1)
 
-        # Far-right: slideshow panel
+        # Center: video display
+        self.video_label = QLabel("Press Start to begin")
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setMinimumSize(640, 480)
+        self.video_label.setStyleSheet("background-color: black; color: white;")
+        layout.addWidget(self.video_label, stretch=2)
+
+        # Right: slideshow panel
         self.slideshow = SlideshowWidget()
-        layout.addWidget(self.slideshow, stretch=1)
+        layout.addWidget(self.slideshow, stretch=3)
 
     def _load_defaults(self):
         """Populate widgets with defaults from educational.txt."""
