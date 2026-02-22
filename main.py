@@ -34,7 +34,6 @@ from torch.cuda import is_available
 
 
 def log_error(message: str, exc: Exception | None = None) -> None:
-    """Print non-fatal errors in a consistent way."""
     print(f"[ERROR] {message}")
     if exc is not None:
         print(f"        {type(exc).__name__}: {exc}")
@@ -46,10 +45,6 @@ mtcnn = MTCNN(device=device)
 
 
 def load_settings_from_file(path: str = "educational.txt") -> list[dict]:
-    """
-    Parse educational.txt and return a list of setting dicts.
-    Each line is: name|default|description
-    """
     settings = []
     try:
         with open(path, "r") as f:
@@ -70,7 +65,6 @@ def load_settings_from_file(path: str = "educational.txt") -> list[dict]:
 
 
 def save_face(face_image, match_file):
-    """Save a detected face image to disk. Never raises; logs on failure."""
     try:
         face_image = Image.fromarray(face_image)
 
@@ -91,11 +85,6 @@ def save_face(face_image, match_file):
 def save_unrecognized_face_and_add_embedding(
     face_image, face_embedding, embeddings: dict, live_dir: str = "./live_detected"
 ):
-    """
-    Save an unrecognized face into live_detected as person[n+1].jpg and
-    immediately add its embedding into the in-memory embeddings dict so that
-    the same person is recognized in subsequent frames.
-    """
     try:
         os.makedirs(live_dir, exist_ok=True)
 
@@ -134,9 +123,6 @@ def is_face_high_quality_for_live_detect(
     min_live_area: int,
     sharpness_threshold: float = 100.0,
 ):
-    """
-    Return True if this face crop is good enough to be stored in live_detected.
-    """
     try:
         if face_area < min_live_area:
             return False
@@ -164,7 +150,6 @@ def is_face_high_quality_for_live_detect(
 
 
 def get_embedding(face):
-    """Return embedding for a single face crop. Returns None on any failure."""
     try:
         tensor_image = mtcnn(face)
     except Exception as e:
@@ -182,10 +167,6 @@ def get_embedding(face):
 
 
 def face_matching(face_embedding, embeddings: list | dict, similarity_threshold: float):
-    """
-    Matches the face_embedding with the embeddings and returns match info
-    or False.
-    """
     for i, embedding in enumerate(embeddings):
         cosine_similarity = cosine(face_embedding, embedding)
 
@@ -197,9 +178,6 @@ def face_matching(face_embedding, embeddings: list | dict, similarity_threshold:
 
 
 def load_embeddings(load_amount: int, images_path: str) -> dict:
-    """
-    Loads the face embeddings from the images in the images_path folder.
-    """
     try:
         if images_path[-1] != "/":
             images_path += "/"
@@ -250,8 +228,6 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
 
 
 class VideoThread(QThread):
-    """Runs video capture and face recognition in a separate thread."""
-
     frame_ready = pyqtSignal(np.ndarray)
 
     def __init__(self, video_source, embeddings, settings, lock, parent=None):
@@ -476,8 +452,6 @@ SLIDESHOW_SLIDES = [
 
 
 class SlideshowWidget(QWidget):
-    """A simple slideshow displaying a title, image placeholder, and paragraph."""
-
     def __init__(self, slides: list[dict] | None = None, parent=None):
         super().__init__(parent)
         self.slides = slides or SLIDESHOW_SLIDES
@@ -565,10 +539,6 @@ class SlideshowWidget(QWidget):
         self._show_slide(self._current + 1)
 
 
-# ---------------------------------------------------------------------------
-# Main window
-# ---------------------------------------------------------------------------
-
 class MainWindow(QMainWindow):
     """PyQt5 main window with video stream and live-adjustable settings."""
 
@@ -584,8 +554,6 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._load_defaults()
-
-    # -- UI construction ----------------------------------------------------
 
     def _build_ui(self):
         central = QWidget()
@@ -676,8 +644,6 @@ class MainWindow(QMainWindow):
         self.max_distance_spin.setValue(float(defaults.get("max_distance", "0.4")))
         self.min_live_area_spin.setValue(int(defaults.get("min_live_area", "4900")))
 
-    # -- Settings helpers ---------------------------------------------------
-
     def _read_settings(self) -> dict:
         return {
             "images_path": self.images_path_edit.text(),
@@ -694,8 +660,6 @@ class MainWindow(QMainWindow):
         self.settings["min_probability"] = self.min_probability_spin.value()
         self.settings["max_distance"] = self.max_distance_spin.value()
         self.settings["min_live_area"] = self.min_live_area_spin.value()
-
-    # -- Start / Stop -------------------------------------------------------
 
     def _on_start(self):
         if self.video_thread and self.video_thread.isRunning():
@@ -748,8 +712,6 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(False)
         self.video_label.setText("Stream ended")
 
-    # -- Frame display ------------------------------------------------------
-
     @pyqtSlot(np.ndarray)
     def _update_frame(self, rgb_frame: np.ndarray):
         """Convert a numpy RGB frame to QPixmap and display it."""
@@ -760,8 +722,6 @@ class MainWindow(QMainWindow):
             self.video_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
         self.video_label.setPixmap(pixmap)
-
-    # -- Cleanup ------------------------------------------------------------
 
     def closeEvent(self, event):
         self._on_stop()
