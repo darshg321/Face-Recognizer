@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import threading
 from random import randint
@@ -67,6 +68,87 @@ def load_settings_from_file(path: str = "educational.txt") -> list[dict]:
     except Exception as e:
         log_error("Failed to load educational.txt", e)
     return settings
+
+
+def load_slides_from_text_file(path: str = "text.txt") -> list[dict]:
+    """
+    Parse text.txt and return a list of slide dicts.
+
+    The file contains section headings (short prompt lines), content paragraphs
+    (long answer text), inline reference lines (``[n]https://...``), and
+    an IEEE-style bibliography at the end.  Each content paragraph becomes one
+    slide whose title is the heading that immediately precedes it and whose
+    footnotes are the bibliography entries for every ``[n]`` citation in the
+    paragraph.
+    """
+    try:
+        with open(path, "r") as f:
+            raw = f.read()
+    except Exception as e:
+        log_error(f"Failed to load {path}", e)
+        return []
+
+    lines = raw.split("\n")
+
+    # --- Locate and parse the bibliography section ---
+    bib_start = None
+    for i, line in enumerate(lines):
+        if line.strip().lower() == "bibliography":
+            bib_start = i
+            break
+
+    bibliography: dict[int, str] = {}
+    if bib_start is not None:
+        current_ref: int | None = None
+        for line in lines[bib_start + 1 :]:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            m = re.match(r"^\[(\d+)\]$", stripped)
+            if m:
+                current_ref = int(m.group(1))
+            elif current_ref is not None:
+                bibliography[current_ref] = stripped
+                current_ref = None
+
+    # --- Build slides from the content before the bibliography ---
+    content_lines = lines[: bib_start] if bib_start is not None else lines
+    ref_line_re = re.compile(r"^\[\d+\]https?://")
+    # Content paragraphs (student answers) are typically 300+ characters;
+    # section headings and prompts are shorter.
+    CONTENT_MIN_LEN = 300
+
+    slides: list[dict] = []
+    pending_headings: list[str] = []
+
+    for line in content_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        # Skip inline reference-URL lines
+        if ref_line_re.match(stripped):
+            continue
+
+        if len(stripped) >= CONTENT_MIN_LEN:
+            # Content paragraph → create a slide
+            title = pending_headings[-1] if pending_headings else ""
+            body = stripped
+
+            # Collect cited reference numbers and build footnotes
+            refs = sorted(set(int(n) for n in re.findall(r"\[(\d+)\]", body)))
+            footnote_lines = [
+                f"[{r}] {bibliography[r]}" for r in refs if r in bibliography
+            ]
+            slides.append({
+                "title": title,
+                "body": body,
+                "footnotes": "\n".join(footnote_lines),
+            })
+            pending_headings = []
+        else:
+            pending_headings.append(stripped)
+
+    return slides
 
 
 def save_face(face_image, match_file):
@@ -357,30 +439,7 @@ class VideoThread(QThread):
 # Slideshow widget
 # ---------------------------------------------------------------------------
 
-SLIDESHOW_SLIDES = [
-    {
-        "title": "Welcome to Face Recognizer",
-        "body": (
-            "This application uses deep learning to detect and recognize faces "
-            "in real-time video streams. Press Start on the settings panel to begin."
-        ),
-    },
-    {
-        "title": "How It Works",
-        "body": (
-            "Faces are detected using MTCNN and encoded with a FaceNet model. "
-            "Each detected face is compared against a database of known embeddings "
-            "to find the closest match."
-        ),
-    },
-    {
-        "title": "Live Detection",
-        "body": (
-            "Unrecognized faces that meet quality thresholds are automatically saved "
-            "to the live_detected folder so they can be recognized in future frames."
-        ),
-    },
-]
+SLIDESHOW_SLIDES = load_slides_from_text_file()
 
 
 class SlideshowWidget(QWidget):
@@ -423,6 +482,16 @@ class SlideshowWidget(QWidget):
         self.body_label.setStyleSheet("font-size: 15px;")
         layout.addWidget(self.body_label)
 
+        # Footnotes (IEEE bibliography references)
+        self.footnotes_label = QLabel()
+        self.footnotes_label.setWordWrap(True)
+        self.footnotes_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.footnotes_label.setStyleSheet(
+            "font-size: 11px; color: #555; border-top: 1px solid #ccc;"
+            " padding-top: 6px; margin-top: 4px;"
+        )
+        layout.addWidget(self.footnotes_label)
+
         # Push arrows to the bottom-right
         layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
@@ -448,6 +517,7 @@ class SlideshowWidget(QWidget):
         slide = self.slides[self._current]
         self.title_label.setText(slide.get("title", ""))
         self.body_label.setText(slide.get("body", ""))
+        self.footnotes_label.setText(slide.get("footnotes", ""))
 
     def _prev_slide(self):
         self._show_slide(self._current - 1)
