@@ -1,0 +1,58 @@
+Use face-recognizer and gui to create an interactive program presenting all the work
+What your topic is (focusing on the technology).
+Facial Recognition systems are technologies used to identify and verify individuals based on unique facial features extracted from images. These use sophisticated algorithms and AI techniques to achieve this [1]. The most common algorithm used is Convolutional Neural Networks (CNNs) [2], which are deep learning models, trained on millions of images to classify something, in this case a face, to a specific type, in this case a specific person. On the hardware side, these images are collected using cameras, though research is being done on the assistance of collecting data through additional means, such as thermal cameras and skin texture analysis [2], to improve the accuracy further. Once these images are captured, because images take up a lot of space, they are instead converted into a unique, compressed string of identifiers such as jawline shape or distance between eyes, and stored for use in recognition [3]. While this technology is used by billions of people in everyday life to unlock their phones, advanced technology is being used to monitor citizens such as in China, where it has been allegedly used in the Uyghur genocide to single out these citizens [4], or in the United States, where an app is being used by ICE agents to mass-surveil people by pulling from a 1.2 billion image database [5].
+[1]https://www.geeksforgeeks.org/computer-vision/how-do-facial-recognition-systems-work/
+[2]https://recfaces.com/articles/facial-recognition-algorithms
+[3]https://www.envistaforensics.com/en-ca/knowledge-center/insights/articles/facial-recognition-technology-how-it-works-types-accuracy-and-ethical-concerns/
+[4]https://www.cnet.com/news/politics/in-china-facial-recognition-public-shaming-and-control-go-hand-in-hand/
+[5]https://www.bloomberg.com/news/articles/2026-02-02/dhs-face-scanning-app-pulls-from-1-2-billion-image-database
+Societal impacts of your topic.
+AI has widely been recognized as the forefront of technology, but many critics say it enhances existing inequalities in marginalized communities [6]. Companies developing this technology often speak of a brighter future due to facial recognition technology, through minor conveniences in payment at checkouts or enhanced security [6], however far more often this technology is misused or used for harm, through for example a Chinese city publicly shaming citizens for being outside in pajamas [7], or a protester in the U.S being tracked down by police officers [6]. Outside of this harm, facial recognition does benefit secure systems, for a convenient and mostly effective way for identification, though minorities have been shown to be misidentified many times more due to bias in the training data, where many sample image sets contain significantly more caucasian persons than minorities [6]. Overall, while this technology does have its benefits in security, its harms to civil liberty through mass-surveillance systems cannot be understated, and must be regulated through policy to ensure malicious governments do not reduce the very little privacy citizens already have.
+[6]https://nonprofitquarterly.org/facial-recognition-technologys-enduring-threat-to-civil-liberties/
+[7]https://www.cnet.com/culture/chinese-city-uses-surveillance-tech-to-shame-citizens-for-wearing-pajamas-outside/
+Ethical impacts of your topic and possible solutions (other than awareness/education)
+The unethical impact on privacy cannot be underestimated, and the only solution is regulation. The primary issue is the perpetrators of these malicious uses are governments themselves, and through portraying that these measures reduce crime, only true in certain cases and additionally with best intentions by the user [8], regimes and oppressors are often justifying their use. Citizens must be informed about both the upsides and downsides of the technology, and advocate for government regulation to limit their own use of this technology to only when it's needed, with a clear purpose of arresting an active danger, and deleting data once this purpose has been fulfilled. This is the only way for citizens to be able to maintain their privacy at a time where it’s treated as an afterthought.
+[8]https://www.bbc.com/news/articles/cdx5528xrzko
+How might your topic be used to support environmental protection measures?
+While the harm model-training costs can never be outweighed, facial recognition technology does benefit the environment in certain ways. The most significant of these is in a digital identification system, which significantly reduces the amount of PVC cards currently used for identification around the world [9]. PVC plastic is one of the most harmful types of plastic, due to its durability and completely unrecyclable nature, and the reduction of these would certainly reduce plastic rot in landfills.
+[9]https://rock.alcatraz.ai/blog/going-green-with-access-control-the-environmental-benefits-of-facial-biometric-technology
+Provide a brief introduction to one career that either develops or uses your technology, and then provide information on:
+Traditional post-secondary education pathway (university, college, training etc).
+A traditional education pathway would be through university, where one would major in Computer Science, Computer Engineering, or Data Science. CS and CE both provide in-depth insight into the algorithms used and implementation of facial recognition technology, where the latter additionally expands on integration with hardware used, such as cameras and sensors. Data Science provides significantly more depth in the actual training of models, where deep learning and how to work with datasets measured in the billions are core concepts learned. 
+Non-traditional experiential learning opportunities for someone working in the field or towards joining the field.  This can include conferences, clubs/associations, hackathons/competitions (do not mention internships or co-operative education).
+Non-traditional experience includes primarily events and competitions, such as hackathons. Many hackathons provide helpful learning opportunities in using facial recognition technology to solve a real-world issue, and competitions such as NeurIPS, a competition for implementing fair AI facial recognition models [10], provide a platform to showcase skills, where often the top prize is even an interview at companies sponsoring the competition.
+[10]https://www.codabench.org/competitions/7166/
+Include trends of the career above (i.e. salary going up, amount of jobs available over time etc.).
+Due to facial recognition being a widely varied field in types of companies hiring, a salary range may extend from $55K-$200K depending on the type of job [11]. For example, a data annotator job may pay a modest salary of $75K [11], trending upwards due to the extensive budgets companies currently spend on AI, while being an MLOps (Machine Learning Operations) Team Lead may go up to $200K and increasing, due to a very high demand for AI-knowledgeable developers.
+[11]https://opencv.org/blog/computer-vision-engineer-salary/
+
+For the career you’ve chosen, imagine that this individual is purchasing a new computer.  Choose two computer components that they should prioritize, and provide information on:
+The purpose of those components in a computer, and why it’s important for the individual.
+Specific recommendations for component specifications (“clock speed of ____”, “capacity of ______”) with justification and understanding of what these mean.
+Limitations on components: at least one component must be internal. We are interested in typical computer components (CPU, RAM, monitor etc) not highly advanced/specific components.
+While AI model training and testing require very high-end hardware, companies use commercial servers that employees can access, and so employees of this field do not actually need particularly powerful CPUs and GPUs. However, people in jobs such as MLOps Engineer or Data Scientist must at times view very large data sets, and so would benefit from a computer with a large amount of RAM to smoothly open these data sets; a good amount may be 32GB, enough to load large amounts of data into memory. For external components, to view this data easily, they might benefit from a desk setup with two 24-inch monitors or larger, a keyboard for any times they may need to code, and a decent microphone such as a Blue Yeti, due to their large amounts of daily meetings. 
+
+Bibliography
+[1]
+GeeksforGeeks, “How do facial recognition systems work?,” GeeksforGeeks, Jul. 04, 2024. https://www.geeksforgeeks.org/computer-vision/how-do-facial-recognition-systems-work/
+[2]
+Recfaces, “Understanding Facial Recognition Algorithms,” RecFaces, Mar. 25, 2021. https://recfaces.com/articles/facial-recognition-algorithms
+[3]
+“Facial Recognition Technology: How It Works, Types, Accuracy, and Ethical Concerns | Envista Forensics,” www.envistaforensics.com. https://www.envistaforensics.com/en-ca/knowledge-center/insights/articles/facial-recognition-technology-how-it-works-types-accuracy-and-ethical-concerns/
+[4]
+A. Ng, “How China uses facial recognition to control human behavior,” CNET, Aug. 11, 2020. https://www.cnet.com/news/politics/in-china-facial-recognition-public-shaming-and-control-go-hand-in-hand/
+[5]
+P. H. O’Neill, “DHS Face-Scanning App Pulls From 1.2 Billion‑Image Database,” Bloomberg.com, Feb. 02, 2026. https://www.bloomberg.com/news/articles/2026-02-02/dhs-face-scanning-app-pulls-from-1-2-billion-image-database (accessed Feb. 19, 2026).
+[6]
+T. M. Gordon, “Facial Recognition Technology’s Enduring Threat to Civil Liberties,” Non Profit News | Nonprofit Quarterly, Dec. 21, 2023. https://nonprofitquarterly.org/facial-recognition-technologys-enduring-threat-to-civil-liberties/
+[7]
+D. V. Boom, “Chinese city uses surveillance tech to shame citizens for wearing pyjamas,” CNET, Jan. 22, 2020. https://www.cnet.com/culture/chinese-city-uses-surveillance-tech-to-shame-citizens-for-wearing-pajamas-outside/
+[8]
+S. Jessup, “Facial recognition cameras helps make 1,000 arrests, Met says,” Jul. 04, 2025. Available: https://www.bbc.com/news/articles/cdx5528xrzko
+[9]
+A. AI, “Going Green with Access Control: Environmental Benefits of Facial Biometric Technology,” Alcatraz.ai, Apr. 27, 2023. https://rock.alcatraz.ai/blog/going-green-with-access-control-the-environmental-benefits-of-facial-biometric-technology
+[10]
+“NeurIPS 2025: Fairness in AI Face Detection Challenge - Codabench,” Codabench.org, 2025. https://www.codabench.org/competitions/7166/ (accessed Feb. 19, 2026).
+[11]
+sandeep, “Computer Vision Engineer Salary in 2025,” OpenCV, Jan. 29, 2025. https://opencv.org/blog/computer-vision-engineer-salary/
+

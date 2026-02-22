@@ -15,12 +15,15 @@ from PyQt5.QtWidgets import (
     QCheckBox,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
     QPushButton,
+    QSizePolicy,
+    QSpacerItem,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -246,10 +249,6 @@ def load_embeddings(load_amount: int, images_path: str) -> dict:
     return images_embeddings
 
 
-# ---------------------------------------------------------------------------
-# Video processing thread
-# ---------------------------------------------------------------------------
-
 class VideoThread(QThread):
     """Runs video capture and face recognition in a separate thread."""
 
@@ -350,6 +349,222 @@ class VideoThread(QThread):
         self.wait()
 
 
+SLIDESHOW_SLIDES = [
+    {
+        "title": "Facial Recognition Technology Overview",
+        "body": (
+            "Facial recognition systems are technologies used to identify and verify "
+            "individuals based on unique facial features extracted from images [1]. "
+            "These systems rely on advanced algorithms and artificial intelligence "
+            "to analyze facial data. They are widely deployed in consumer devices, "
+            "security systems, and surveillance infrastructures.\n\n"
+            "Footnote:\n"
+            "[1] GeeksforGeeks, “How do facial recognition systems work?,” Jul. 04, 2024. Image: https://www.researchgate.net/publication/343699139/figure/fig2/AS:933733284724738@1599630771707/dentification-of-facial-landmarks-using-Dlib-a-Facial-landmarks-b-The-position-and.jpg"
+        ),
+        "image": "./slide_images/slide1.png"
+    },
+    {
+        "title": "Core Algorithms and Hardware",
+        "body": (
+            "Most modern facial recognition systems use Convolutional Neural Networks (CNNs), "
+            "a type of deep learning model trained on millions of images to classify faces "
+            "as belonging to specific individuals [2]. Images are typically captured through "
+            "standard cameras, though research explores thermal imaging and skin texture analysis "
+            "to improve accuracy [2].\n\n"
+            "Footnote:\n"
+            "[2] RecFaces, “Understanding Facial Recognition Algorithms,” Mar. 25, 2021. Image: https://media.licdn.com/dms/image/v2/D5612AQGOui8XZUZJSA/article-cover_image-shrink_600_2000/article-cover_image-shrink_600_2000/0/1680532048475?e=1773273600&v=beta&t=6fKSAXnWwuVVuYe76kV81v3l7g6tKLAgZ4qtTtwckSk"
+        ),
+        "image": "./slide_images/slide2.png"
+    },
+    {
+        "title": "Encoding and Data Storage",
+        "body": (
+            "Instead of storing full images, systems convert faces into compact mathematical "
+            "representations called embeddings [3]. These embeddings encode measurable features "
+            "such as facial structure and spatial relationships into numerical vectors. "
+            "This enables efficient database comparison while reducing storage demands.\n\n"
+            "Footnote:\n"
+            "[3] Envista Forensics, “Facial Recognition Technology: How It Works, Types, Accuracy, and Ethical Concerns.” Image: https://www.collaborative-ai.org/assets/img/openthesis/openthesis_florian3.png"
+        ),
+        "image": "./slide_images/slide3.png"
+    },
+    {
+        "title": "Global Deployment and Surveillance",
+        "body": (
+            "Facial recognition is widely used in smartphones and access control systems. "
+            "However, reports describe its use in China to monitor Uyghur populations [4], "
+            "and in the United States where a DHS face-scanning app reportedly accesses "
+            "a 1.2-billion-image database [5]. These deployments raise significant civil liberty concerns.\n\n"
+            "Footnotes:\n"
+            "[4] A. Ng, CNET, “How China uses facial recognition to control human behavior,” Aug. 11, 2020.\n"
+            "[5] P. H. O’Neill, Bloomberg, “DHS Face-Scanning App Pulls From 1.2 Billion-Image Database,” Feb. 02, 2026. Image: https://www.journalofdemocracy.org/wp-content/uploads/2019/03/3-21-19-Digital-Freedom-1-1000x717.jpg"
+        ),
+        "image": "./slide_images/slide4.png"
+    },
+    {
+        "title": "Societal Impacts and Bias",
+        "body": (
+            "While promoted as improving security and convenience [6], facial recognition "
+            "has been used for public shaming and protest tracking [6][7]. Research shows "
+            "higher misidentification rates among minority groups due to biased training datasets [6]. "
+            "These disparities reinforce existing inequalities.\n\n"
+            "Footnotes:\n"
+            "[6] T. M. Gordon, Nonprofit Quarterly, “Facial Recognition Technology’s Enduring Threat to Civil Liberties,” Dec. 21, 2023.\n"
+            "[7] D. V. Boom, CNET, “Chinese city uses surveillance tech to shame citizens for wearing pyjamas,” Jan. 22, 2020. Image: https://substackcdn.com/image/fetch/$s_!oaf7!,w_1456,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F18171a5c-439c-4305-9656-a3aef54d56be_866x1000.jpeg"
+        ),
+        "image": "./slide_images/slide5.png"
+    },
+    {
+        "title": "Ethical Concerns and Regulation",
+        "body": (
+            "Privacy risks are substantial, particularly when governments justify use "
+            "under crime-prevention claims [8]. Effective regulation would limit deployment "
+            "to clearly defined cases, require strict oversight, and mandate data deletion "
+            "once investigative purposes are fulfilled.\n\n"
+            "Footnote:\n"
+            "[8] S. Jessup, BBC News, “Facial recognition cameras helps make 1,000 arrests, Met says,” Jul. 04, 2025. Image: https://media.licdn.com/dms/image/v2/D4E12AQGI5HiaG4ybbg/article-cover_image-shrink_720_1280/article-cover_image-shrink_720_1280/0/1735558451768?e=2147483647&v=beta&t=1KByZhSv1Lr3VqGpsUbyWm6QYtEjyviBjbzoVQkJVZE"
+        ),
+        "image": "./slide_images/slide6.png"
+    },
+    {
+        "title": "Environmental Considerations",
+        "body": (
+            "Although AI model training consumes significant computational resources, "
+            "facial recognition can reduce reliance on PVC-based identification cards [9]. "
+            "PVC plastic is durable and difficult to recycle, and reducing its use "
+            "may decrease long-term landfill accumulation.\n\n"
+            "Footnote:\n"
+            "[9] A. AI, Alcatraz.ai, “Going Green with Access Control: Environmental Benefits of Facial Biometric Technology,” Apr. 27, 2023. Image: https://cdn.prod.website-files.com/61845f7929f5aa517ebab941/653641b4a50de2ac4160312d_Aratek%20BA8300-A%20Multi-factor%20Facial%20Recognition%20Terminal.jpg"
+        ),
+        "image": "./slide_images/slide7.png"
+    },
+    {
+        "title": "Career Path: Computer Vision Engineer",
+        "body": (
+            "Professionals who develop facial recognition systems often work as Computer Vision "
+            "Engineers or MLOps Engineers. Traditional pathways include university degrees in "
+            "Computer Science, Computer Engineering, or Data Science. These programs focus on "
+            "deep learning, algorithm implementation, and large-scale dataset management. Image: https://cdn.prod.website-files.com/5e2f57fa78b207413fbfc836/609bdc047c480348b8e5d279_i5wHrguld5rIXp4MSp8beM7mA0GMhnBULv9TJBUq8K8287qtKRa3aDu45TA_QHnv8tcik0xnjBxw8E2yQD9GMZF-fEhtxorp8Z7nYkUE99jwVGz8lnULKy2DOcCEsvWjRKfzfK0g.jpeg"
+        ),
+        "image": "./slide_images/slide8.png"
+    },
+    {
+        "title": "Experiential Learning and Industry Trends",
+        "body": (
+            "Non-traditional experience includes hackathons and competitions such as the "
+            "NeurIPS 2025 Fairness in AI Face Detection Challenge [10]. These events allow "
+            "participants to develop and evaluate models under fairness constraints. "
+            "Salary ranges in the field extend from approximately $55K to $200K depending "
+            "on specialization and seniority [11].\n\n"
+            "Footnotes:\n"
+            "[10] Codabench, “NeurIPS 2025: Fairness in AI Face Detection Challenge.”\n"
+            "[11] OpenCV, “Computer Vision Engineer Salary in 2025,” Jan. 29, 2025. Image: https://resources.formula-e.pulselive.com/photo-resources/2024/07/25/537626be-4350-49d6-845a-dfe456cdbe32/JL202884.jpg?width=1440&height=810"
+        ),
+        "image": "./slide_images/slide9.png"
+    },
+    {
+        "title": "Recommended Computer Components",
+        "body": (
+            "Professionals handling large datasets benefit from 32GB of RAM to load and process "
+            "substantial volumes of data efficiently. RAM temporarily stores active data for quick access. "
+            "A dual 24-inch monitor setup improves productivity when coding, debugging, "
+            "and visualizing datasets. These components enhance workflow without requiring enterprise-level hardware. Image: https://i.ytimg.com/vi/Z6fjOeC7avo/maxresdefault.jpg"
+        ),
+        "image": "./slide_images/slide10.png"
+    },
+]
+
+
+class SlideshowWidget(QWidget):
+    """A simple slideshow displaying a title, image placeholder, and paragraph."""
+
+    def __init__(self, slides: list[dict] | None = None, parent=None):
+        super().__init__(parent)
+        self.slides = slides or SLIDESHOW_SLIDES
+        self._current = 0
+        self._build_ui()
+        self._show_slide(0)
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        # Title
+        self.title_label = QLabel()
+        self.title_label.setWordWrap(True)
+        self.title_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.title_label.setStyleSheet("font-size: 22px; font-weight: bold;")
+        layout.addWidget(self.title_label)
+
+        # Image placeholder (a bordered box)
+        self.image_label = QLabel()
+        self.image_label.setFixedSize(480, 320)
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setFrameShape(QFrame.Box)
+        self.image_label.setStyleSheet(
+            "background-color: #e0e0e0; color: #888; font-size: 13px; border: 2px solid #aaa;"
+        )
+        self.image_label.setText("[ Image Placeholder ]")
+        layout.addWidget(self.image_label, alignment=Qt.AlignHCenter)
+
+        # Body text
+        self.body_label = QLabel()
+        self.body_label.setWordWrap(True)
+        self.body_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.body_label.setStyleSheet("font-size: 15px;")
+        layout.addWidget(self.body_label)
+
+        # Push arrows to the bottom-right
+        layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        arrow_layout = QHBoxLayout()
+        arrow_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+
+        self.prev_btn = QPushButton("\u25C0")
+        self.prev_btn.setFixedSize(36, 36)
+        self.prev_btn.clicked.connect(self._prev_slide)
+        arrow_layout.addWidget(self.prev_btn)
+
+        self.next_btn = QPushButton("\u25B6")
+        self.next_btn.setFixedSize(36, 36)
+        self.next_btn.clicked.connect(self._next_slide)
+        arrow_layout.addWidget(self.next_btn)
+
+        layout.addLayout(arrow_layout)
+
+    def _show_slide(self, index: int):
+        if not self.slides:
+            return
+
+        self._current = index % len(self.slides)
+        slide = self.slides[self._current]
+
+        self.title_label.setText(slide.get("title", ""))
+        self.body_label.setText(slide.get("body", ""))
+
+        image_path = slide.get("image")
+
+        if image_path and os.path.exists(image_path):
+            pixmap = QPixmap(image_path)
+            scaled_pixmap = pixmap.scaled(
+                self.image_label.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.image_label.setPixmap(scaled_pixmap)
+            self.image_label.setText("")
+        else:
+            self.image_label.setPixmap(QPixmap())
+            self.image_label.setText("[ Image Not Found ]")
+
+    def _prev_slide(self):
+        self._show_slide(self._current - 1)
+
+    def _next_slide(self):
+        self._show_slide(self._current + 1)
+
+
 # ---------------------------------------------------------------------------
 # Main window
 # ---------------------------------------------------------------------------
@@ -377,14 +592,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
 
-        # Left: video display
-        self.video_label = QLabel("Press Start to begin")
-        self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.setMinimumSize(640, 480)
-        self.video_label.setStyleSheet("background-color: black; color: white;")
-        layout.addWidget(self.video_label, stretch=3)
-
-        # Right: settings panel
+        # Left: settings panel
         settings_group = QGroupBox("Settings")
         form = QFormLayout()
 
@@ -417,17 +625,10 @@ class MainWindow(QMainWindow):
         self.min_live_area_spin.setRange(0, 1000000)
         form.addRow("min_live_area:", self.min_live_area_spin)
 
-        # Description labels loaded from educational.txt
-        for s in self._settings_data:
-            desc_label = QLabel(s["description"])
-            desc_label.setWordWrap(True)
-            desc_label.setStyleSheet("color: gray; font-size: 10px;")
-            form.addRow("", desc_label)
-
         settings_group.setLayout(form)
 
-        right_panel = QVBoxLayout()
-        right_panel.addWidget(settings_group)
+        left_panel = QVBoxLayout()
+        left_panel.addWidget(settings_group)
 
         # Connect live-update signals for numeric settings
         self.min_probability_spin.valueChanged.connect(self._apply_live_settings)
@@ -445,8 +646,19 @@ class MainWindow(QMainWindow):
         self.stop_btn.setEnabled(False)
         btn_layout.addWidget(self.stop_btn)
 
-        right_panel.addLayout(btn_layout)
-        layout.addLayout(right_panel, stretch=1)
+        left_panel.addLayout(btn_layout)
+        layout.addLayout(left_panel, stretch=1)
+
+        # Center: video display
+        self.video_label = QLabel("Press Start to begin")
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setMinimumSize(640, 480)
+        self.video_label.setStyleSheet("background-color: black; color: white;")
+        layout.addWidget(self.video_label, stretch=2)
+
+        # Right: slideshow panel
+        self.slideshow = SlideshowWidget()
+        layout.addWidget(self.slideshow, stretch=3)
 
     def _load_defaults(self):
         """Populate widgets with defaults from educational.txt."""
@@ -559,7 +771,7 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.resize(1100, 600)
+    window.resize(1400, 700)
     window.show()
     sys.exit(app.exec_())
 
