@@ -34,6 +34,9 @@ from scipy.spatial.distance import cosine
 from torch.cuda import is_available
 
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 def log_error(message: str, exc: Exception | None = None) -> None:
     """Print non-fatal errors in a consistent way."""
     print(f"[ERROR] {message}")
@@ -51,6 +54,8 @@ def load_settings_from_file(path: str = "educational.txt") -> list[dict]:
     Parse educational.txt and return a list of setting dicts.
     Each line is: name|default|description
     """
+    if not os.path.isabs(path):
+        path = os.path.join(_SCRIPT_DIR, path)
     settings = []
     try:
         with open(path, "r") as f:
@@ -82,6 +87,8 @@ def load_slides_from_text_file(path: str = "text.txt") -> list[dict]:
     paragraph.
     """
     try:
+        if not os.path.isabs(path):
+            path = os.path.join(_SCRIPT_DIR, path)
         with open(path, "r") as f:
             raw = f.read()
     except Exception as e:
